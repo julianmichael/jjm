@@ -1,0 +1,4 @@
+Monocle:
+- "with default" modifier to lens to option: given a lens to opt and default value,
+-- get: getOrElse the default value on the result
+-- set: set Some of the value
