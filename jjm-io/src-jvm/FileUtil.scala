@@ -1,6 +1,4 @@
-package qfirst
-import qfirst.frames._
-import FrameDataWriter.FrameInfo
+package jjm.io
 
 import cats.implicits._
 import cats.data.NonEmptyList
@@ -8,6 +6,7 @@ import cats.effect.{ContextShift, ExitCode, IO, IOApp, Resource}
 
 import io.circe.jawn
 import io.circe.{Encoder, Decoder}
+import io.circe.Printer
 
 import fs2.Stream
 
@@ -17,9 +16,16 @@ import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContextExecutorService
 
-import io.circe.Printer
-
 object FileUtil {
+
+  def sendToClipboard(s: String): IO[Unit] = IO {
+    import java.awt._;
+    import java.awt.datatransfer._;
+    import java.io._;
+    val selection = new StringSelection(s)
+    val clipboard = Toolkit.getDefaultToolkit.getSystemClipboard
+    clipboard.setContents(selection, selection)
+  }
 
   val blockingExecutionContext =
     Resource.make(IO(ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(2))))(ec => IO(ec.shutdown()))

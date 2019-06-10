@@ -1,18 +1,25 @@
 package jjm.ling
 
+import jjm.implicits._
+
 import cats.Id
 import cats.Foldable
 import cats.Monad
 import cats.Monoid
+import cats.Traverse
 import cats.implicits._
-// import cats.data._
-// import scala.language.higherKinds
 
-import HasTokens.ops._
-import HasAlignedTokens.ops._
+import shapeless.HList
+import shapeless.ops.record.Updater
+import shapeless.record._
 
-/** Provides method(s) for rendering text from a list of tokens. */
+/** Provides method(s) for rendering / manipulating text. */
 object Text {
+
+  def addIndices[F[_]: Traverse, R <: HList : Updater[?, Index]](tokens: F[R]) = {
+    tokens.mapWithIndex((r, i) => r.updated(Index, i))
+  }
+
   private val noSpaceBefore = Set(
     ".",
     ",",
@@ -93,11 +100,11 @@ object Text {
     * Allows you to specify how to render spaces and words so you can use this to create interactive DOM elements in JS.
     * And it's monadic.
     */
-  def renderM[Word, F[_]: Foldable, M[_]: Monad, Result: Monoid](
-    words: F[Word],
-    getToken: Word => String,
-    spaceFromNextWord: Word => M[Result],
-    renderWord: Word => M[Result]
+  def renderTokensM[A, F[_]: Foldable, M[_]: Monad, Result: Monoid](
+    words: F[A],
+    getToken: A => String,
+    spaceFromNextWord: A => M[Result],
+    renderWord: A => M[Result]
   ): M[Result] = {
     val hasSingleQuoteOnly = words.toList
       .map(getToken)
@@ -154,67 +161,59 @@ object Text {
   }
 
   /** Monadic convenience method for rendering anything that HasTokens */
-  def renderM[A: HasTokens, M[_]: Monad, Result: Monoid](
-    input: A,
-    spaceFromNextToken: String => M[Result],
+  def renderTokensM[A: HasToken, F[_]: Foldable, M[_]: Monad, Result: Monoid](
+    input: F[A],
+    spaceFromNextToken: A => M[Result],
     renderToken: String => M[Result]
   ): M[Result] =
-    renderM[String, Vector, M, Result](input.tokens, identity, spaceFromNextToken, renderToken)
+    renderTokensM[A, F, M, Result](
+      input,
+      (a: A) => a.token,
+      spaceFromNextToken,
+      (a: A) => renderToken(a.token)
+    )
 
   /** Non-monadic convenience method for renderM with tokens */
-  def render[Word, F[_]: Foldable, M: Monoid](
-    words: F[Word],
-    getToken: Word => String,
-    spaceFromNextWord: Word => M,
-    renderWord: Word => M
+  def renderTokens[A, F[_]: Foldable, M: Monoid](
+    words: F[A],
+    getToken: A => String,
+    spaceFromNextWord: A => M,
+    renderWord: A => M
   ): M =
-    renderM[Word, F, Id, M](words, getToken, spaceFromNextWord, renderWord)
+    renderTokensM[A, F, Id, M](words, getToken, spaceFromNextWord, renderWord)
 
   /** Non-monadic convenience method for rendering anything that HasTokens */
-  def render[A: HasTokens, Result: Monoid](
-    input: A,
-    spaceFromNextToken: String => Result,
+  def renderTokens[A: HasToken, F[_]: Foldable, Result: Monoid](
+    input: F[A],
+    spaceFromNextToken: A => Result,
     renderToken: String => Result
   ): Result = {
-    render[String, Vector, Result](input.tokens, identity, spaceFromNextToken, renderToken)
+    renderTokens[A, F, Result](input, (a: A) => a.token, spaceFromNextToken, (a: A) => renderToken(a.token))
   }
 
   /** Convenience method for rendering a sequence of PTB tokens directly to a string. */
-  def render[F[_]: Foldable](tokens: F[String]): String =
-    render[String, F, String](tokens, identity, (_: String) => " ", normalizeToken(_))
-
-  /** Convenience method for rendering something that HasTokens directly to a string */
-  def render[A: HasTokens](input: A): String = render(input.tokens)
+  def renderTokens[A: HasToken, F[_]: Foldable](tokens: F[A]): String =
+    renderTokens[A, F, String](tokens, (_: A) => " ", normalizeToken(_))
 
   // TODO make the HasTokens ones respect spaces so the result is ACTUALLY always a substring
 
   /** Render a substring of a list of tokens */
-  def renderSpan[F[_]: Foldable](reference: F[String], span: Set[Int]) =
-    render(reference.toList.zipWithIndex.filter(p => span.contains(p._2)).map(_._1))
-
-  /** Render a substring of a something that HasTokens */
-  def renderSpan[A: HasTokens](reference: A, span: Set[Int]) =
-    render(
-      reference.tokens.toList.zipWithIndex
-        .filter(p => span.contains(p._2))
-        .map(_._1)
-    )
+  def renderSpanTokens[A: HasToken : HasIndex, F[_]: Foldable](reference: F[A], span: Span) =
+    renderTokens(reference.toList.filter(p => span.contains(p.index)))
 
   // TODO implement span re-recovery from a string
 
-  // aligned text rendering
-
   /** Returns a correct rendering of aligned tokens that preserves their whitespace. */
-  def renderAlignedM[Word, F[_]: Foldable, M[_]: Monad, Result: Monoid](
-    words: F[Word],
-    getAlignedToken: Word => AlignedToken,
-    spaceFromSurroundingWords: (Option[Word], String, Option[Word]) => M[Result],
-    renderWord: Word => M[Result]
+  def renderSourceM[A, F[_]: Foldable, M[_]: Monad, Result: Monoid](
+    words: F[A],
+    getSourceText: A => TokenText,
+    spaceFromSurroundingWords: (Option[A], String, Option[A]) => M[Result],
+    renderWord: A => M[Result]
   ): M[Result] = {
     val resultPairM =
-      words.foldM[M, (Result, Option[Word])](Monoid[Result].empty, None) {
+      words.foldM[M, (Result, Option[A])](Monoid[Result].empty, None) {
         case ((acc, prevWordOpt), word) =>
-          val alignedToken = getAlignedToken(word)
+          val alignedToken = getSourceText(word)
           for {
             space <- spaceFromSurroundingWords(
               prevWordOpt,
@@ -229,7 +228,7 @@ object Text {
       result <- resultPair._2 match {
         case None => Monad[M].pure(Monoid[Result].empty)
         case Some(word) =>
-          val alignedToken = getAlignedToken(word)
+          val alignedToken = getSourceText(word)
           for {
             space <- spaceFromSurroundingWords(Some(word), alignedToken.whitespaceAfter, None)
           } yield resultPair._1 |+| space
@@ -238,86 +237,107 @@ object Text {
 
   }
 
-  /** Monadic convenience method for rendering anything that HasAlignedTokens */
-  def renderAlignedM[A: HasAlignedTokens, M[_]: Monad, Result: Monoid](
-    input: A,
-    spaceFromSurroundingWords: (Option[AlignedToken], String, Option[AlignedToken]) => M[Result],
+  /** Monadic convenience method for rendering anything that has source text */
+  def renderSourceM[A: HasSourceText, F[_]: Foldable, M[_]: Monad, Result: Monoid](
+    input: F[A],
+    spaceFromSurroundingWords: (Option[A], String, Option[A]) => M[Result],
     renderOriginalToken: String => M[Result]
   ): M[Result] =
-    renderAlignedM[AlignedToken, Vector, M, Result](
-      input.alignedTokens,
-      identity,
+    renderSourceM[A, F, M, Result](
+      input,
+      (a: A) => a.sourceText,
       spaceFromSurroundingWords,
-      (alignedToken: AlignedToken) => renderOriginalToken(alignedToken.originalText)
+      (a: A) => renderOriginalToken(a.sourceText.originalText)
     )
 
   /** Non-monadic convenience method for renderM with aligned tokens */
-  def renderAligned[Word, F[_]: Foldable, Result: Monoid](
-    words: F[Word],
-    getAlignedToken: Word => AlignedToken,
-    spaceFromSurroundingWords: (Option[Word], String, Option[Word]) => Result,
-    renderWord: Word => Result
+  def renderSource[A, F[_]: Foldable, Result: Monoid](
+    words: F[A],
+    getSourceText: A => TokenText,
+    spaceFromSurroundingWords: (Option[A], String, Option[A]) => Result,
+    renderWord: A => Result
   ): Result =
-    renderAlignedM[Word, F, Id, Result](
+    renderSourceM[A, F, Id, Result](
       words,
-      getAlignedToken,
+      getSourceText,
       spaceFromSurroundingWords,
       renderWord
     )
 
-  /** Non-monadic convenience method for rendering anything that HasAlignedTokens */
-  def renderAligned[A: HasAlignedTokens, Result: Monoid](
-    input: A,
-    spaceFromSurroundingWords: (Option[AlignedToken], String, Option[AlignedToken]) => Result,
+  /** Non-monadic convenience method for rendering anything that has source text */
+  def renderSource[A: HasSourceText, F[_]: Foldable, Result: Monoid](
+    input: F[A],
+    spaceFromSurroundingWords: (Option[A], String, Option[A]) => Result,
     renderOriginalToken: String => Result
   ): Result = {
-    renderAligned[AlignedToken, Vector, Result](
-      input.alignedTokens,
-      identity,
-      spaceFromSurroundingWords,
-      (alignedToken: AlignedToken) => renderOriginalToken(alignedToken.originalText)
-    )
-  }
-
-  // render aligned tokens that already know about their whitespace
-  def renderAligned[F[_]: Foldable](alignedTokens: F[AlignedToken]): String =
-    renderAligned[AlignedToken, F, String](
-      alignedTokens,
-      identity,
-      (_: Option[AlignedToken], space: String, _: Option[AlignedToken]) => space,
-      (alignedToken: AlignedToken) => alignedToken.originalText
-    )
-
-  def renderAligned[A: HasAlignedTokens](input: A): String =
-    renderAligned[A, String](
+    renderSource[A, F, Result](
       input,
-      (_: Option[AlignedToken], space: String, _: Option[AlignedToken]) => space,
-      identity
+      (a: A) => a.sourceText,
+      spaceFromSurroundingWords,
+      (a: A) => renderOriginalToken(a.sourceText.originalText)
+    )
+  }
+
+  def renderSource[A: HasSourceText, F[_]: Foldable](input: F[A]): String =
+    renderSource[A, F, String](
+      input,
+      (_: Option[A], space: String, _: Option[A]) => space,
+      identity[String](_)
     )
 
-  def renderAlignedSpan[F[_]: Foldable](reference: F[AlignedToken], span: Set[Int]) = {
-    reference.toList.zipWithIndex
-      .filter(p => span.contains(p._2))
-      .map(_._1) match {
+  def renderSpanSource[A: HasSourceText : HasIndex, F[_]: Foldable](reference: F[A], span: Span) = {
+    reference.toList.filter(p => span.contains(p.index)).map(_.sourceText) match {
       case Nil =>
         ""
-      case firstToken :: restOfTokens =>
-        firstToken.originalText + restOfTokens
+      case first :: rest =>
+        first.originalText + rest
           .map(t => t.whitespaceBefore + t.originalText)
           .mkString
     }
   }
 
-  def renderAlignedSpan[A: HasAlignedTokens](reference: A, span: Set[Int]) = {
-    reference.alignedTokens.toList.zipWithIndex
-      .filter(p => span.contains(p._2))
-      .map(_._1) match {
-      case Nil =>
-        ""
-      case firstToken :: restOfTokens =>
-        firstToken.originalText + restOfTokens
-          .map(t => t.whitespaceBefore + t.originalText)
-          .mkString
+  trait TextRenderer[A, F[_]] { def apply(input: F[A]): String }
+  sealed trait TextRendererLowPriority0 {
+    implicit def stringRenderer[F[_]: Foldable] = new TextRenderer[String, F] {
+      def apply(input: F[String]) = renderTokens(input.toList.map(Token(_)))
     }
   }
+  sealed trait TextRendererLowPriority extends TextRendererLowPriority0 {
+    implicit def tokenRenderer[A: HasToken, F[_]: Foldable] = new TextRenderer[A, F] {
+      def apply(input: F[A]) = renderTokens(input)
+    }
+  }
+  object TextRenderer extends TextRendererLowPriority {
+    implicit def sourceRenderer[A: HasSourceText, F[_]: Foldable] = new TextRenderer[A, F] {
+      def apply(input: F[A]) = renderSource(input)
+    }
+  }
+
+  trait SpanRenderer[A, F[_]] { def apply(input: F[A], span: Span): String }
+  sealed trait SpanRendererLowPriority0 {
+    implicit def stringRenderer[F[_]: Foldable] = new SpanRenderer[String, F] {
+      def apply(input: F[String], span: Span) = renderSpanTokens(addIndices(input.toList.map(Token(_))), span)
+    }
+    implicit def indexingTokenRenderer[A: HasToken, F[_]: Foldable] = new SpanRenderer[A, F] {
+      def apply(input: F[A], span: Span) = renderSpanTokens(addIndices(input.toList.map(t => Token(t.token))), span)
+    }
+  }
+  sealed trait SpanRendererLowPriority extends SpanRendererLowPriority0 {
+    implicit def tokenRenderer[A: HasToken : HasIndex, F[_]: Foldable] = new SpanRenderer[A, F] {
+      def apply(input: F[A], span: Span) = renderSpanTokens(input, span)
+    }
+    implicit def indexingSourceRenderer[A: HasSourceText, F[_]: Foldable] = new SpanRenderer[A, F] {
+      def apply(input: F[A], span: Span) = renderSpanSource(addIndices(input.toList.map(t => SourceText(t.sourceText))), span)
+    }
+  }
+  object SpanRenderer extends SpanRendererLowPriority {
+    implicit def sourceRenderer[A: HasSourceText : HasIndex, F[_]: Foldable] = new SpanRenderer[A, F] {
+      def apply(input: F[A], span: Span) = renderSpanSource(input, span)
+    }
+  }
+
+  // choose at compile time to render source if possible, otherwise fall back to tokens
+
+  def render[A, F[_]](input: F[A])(implicit render: TextRenderer[A, F]): String = render(input)
+  def renderSpan[A, F[_]](input: F[A], span: Span)(implicit render: SpanRenderer[A, F]): String = render(input, span)
 }

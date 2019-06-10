@@ -1,8 +1,6 @@
 package jjm.ling
 
-case class AlignedToken(
-  token: String,
+case class TokenText(
   originalText: String,
   whitespaceBefore: String,
-  whitespaceAfter: String
-)
+  whitespaceAfter: String)
