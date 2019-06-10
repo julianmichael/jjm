@@ -1,26 +1,28 @@
 package jjm
 
+import cats.Id
+
 sealed trait DotPair[F[_], A <: Dot] extends Product with Serializable {
   val fst: A
-  val snd: F[fst.Arg]
+  val snd: F[fst.Out]
 }
 
 object DotPair {
   private[this] case class DotPairImpl[F[_], A <: Dot, B](
-    val fst: A { type Arg = B },
+    val fst: A { type Out = B },
     val snd: F[B]
   ) extends DotPair[F, A] {
     override def toString = s"DotPair($fst, $snd)"
   }
 
-  // def apply[F[_], A <: Dot](fst: A)(snd: F[fst.Arg]): DotPair[F, A] =
-  //   DotPairImpl[A, F[fst.Arg]](fst, snd)
-  def unapply[F[_], A <: Dot](dp: DotPair[F, A]): Option[(A, F[dp.fst.Arg])] =
+  // def apply[F[_], A <: Dot](fst: A)(snd: F[fst.Out]): DotPair[F, A] =
+  //   DotPairImpl[A, F[fst.Out]](fst, snd)
+  def unapply[F[_], A <: Dot](dp: DotPair[F, A]): Option[(A, F[dp.fst.Out])] =
     Some(dp.fst -> dp.snd)
 
   def apply[F[_]] = new ApplyBuilder[F]
   class ApplyBuilder[F[_]] {
-    def apply[A <: Dot](fst: A)(snd: F[fst.Arg]): DotPair[F, A] = DotPairImpl[F, A, fst.Arg](fst, snd)
+    def apply[A <: Dot](fst: A)(snd: F[fst.Out]): DotPair[F, A] = DotPairImpl[F, A, fst.Out](fst, snd)
   }
 
   val unit = apply[Id](jjm.DotUnit)(())

@@ -22,10 +22,10 @@ import monocle.function.Index
 // TODO maybe use a different name for the F[_] version and DotMap for F = Id?
 final class DotMap[F[_], A <: Dot] private (private val map: Map[A, F[_]]) {
 
-  def get(key: A): Option[F[key.Arg]] =
-    map.get(key).asInstanceOf[Option[F[key.Arg]]]
+  def get(key: A): Option[F[key.Out]] =
+    map.get(key).asInstanceOf[Option[F[key.Out]]]
 
-  def put(key: A)(value: F[key.Arg]): DotMap[F, A] =
+  def put(key: A)(value: F[key.Out]): DotMap[F, A] =
     new DotMap[F, A](map + (key -> value))
 
   def +(pair: DotPair[F, A]): DotMap[F, A] =
@@ -41,7 +41,7 @@ final class DotMap[F[_], A <: Dot] private (private val map: Map[A, F[_]]) {
     map.keySet
 
   def iterator: Iterator[DotPair[F, A]] = map.iterator.map { case (k, v) =>
-    DotPair[F](k)(v.asInstanceOf[F[k.Arg]])
+    DotPair[F](k)(v.asInstanceOf[F[k.Out]])
   }
 
   def size: Int =
@@ -70,7 +70,7 @@ final class DotMap[F[_], A <: Dot] private (private val map: Map[A, F[_]]) {
 }
 
 object DotMap extends DotMapInstances {
-  def empty[F[_], A <: Dot] = new DotMap[F, A](Map.empty[A, F[A#Arg]])
+  def empty[F[_], A <: Dot] = new DotMap[F, A](Map.empty[A, F[A#Out]])
 
   def apply[F[_], A <: Dot](pairs: DotPair[F, A]*): DotMap[F, A] = {
     pairs.foldLeft(empty[F, A])(_ + _)
@@ -128,7 +128,7 @@ abstract private[jjm] class DotMapInstances extends DotMapInstances0 {
         val key = keyDecoder(keyStr).get // TODO aah replace the get
         val value = dotDecoder(key).tryDecode(c.downField(keyStr))
         // val foo = Foo(key)
-        // type Arg = foo.Arg
+        // type Out = foo.Out
         value.map(v => m.put(key)(v))
       }
     }
@@ -136,13 +136,13 @@ abstract private[jjm] class DotMapInstances extends DotMapInstances0 {
 
   // TODO Traversal over DotPair elements, if we can get DotPair to work...
 
-  implicit def dotMapAt[F[_], A <: Dot, Arg0]: At[DotMap[F, A], A { type Arg = Arg0 }, Option[F[Arg0]]] =
-    At[DotMap[F, A], A { type Arg = Arg0 }, Option[F[Arg0]]](
+  implicit def dotMapAt[F[_], A <: Dot, Out0]: At[DotMap[F, A], A { type Out = Out0 }, Option[F[Out0]]] =
+    At[DotMap[F, A], A { type Out = Out0 }, Option[F[Out0]]](
       i => map => map.get(i))(
       i => optV => map => optV.fold(map.remove(i))(v => map.put(i)(v))
     )
 
-  implicit def dotMapIndex[F[_], A <: Dot, Arg0]: Index[DotMap[F, A], A { type Arg = Arg0 }, F[Arg0]] = Index.fromAt
+  implicit def dotMapIndex[F[_], A <: Dot, Out0]: Index[DotMap[F, A], A { type Out = Out0 }, F[Out0]] = Index.fromAt
 
   // NOTE: it would be nice to have something like UnorderedFoldable, but we can't since DotMap is not a proper functor
   // intuitively we could instead use a Traversal,

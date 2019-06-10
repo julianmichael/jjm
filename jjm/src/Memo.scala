@@ -1,5 +1,7 @@
 package jjm
 
+import cats.Id
+
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext
 

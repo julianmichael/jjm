@@ -1,21 +1,20 @@
 import io.circe.Decoder
 import io.circe.Encoder
 
+import cats.Id
 import cats.~>
 
 package object jjm {
 
-  protected[jjm] type Id[A] = A // to use here but not clash with cats
-
-  type Dot = Any { type Arg }
+  type Dot = Any { type Out }
 
   // TODO maybe there's a better name for this than DotF?
-  type DotF[A] = { type Aux[B] = A { type Arg = B } }
+  type DotF[A] = { type Aux[B] = A { type Out = B } }
 
   type DotFunction[A <: Dot] = DotKleisli[Id, A]
 
   sealed trait DotUnit extends Product with Serializable {
-    final type Arg = Unit
+    final type Out = Unit
   }
   private[this] case class DotUnitImpl() extends DotUnit {
     override def toString = "DotUnit"

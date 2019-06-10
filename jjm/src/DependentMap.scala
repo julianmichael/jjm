@@ -102,7 +102,7 @@ abstract private[jjm] class DependentMapInstances {
   // to hold the type skolem
 
   private case class Foo[F[_], A](fa: F[A]) {
-    type Arg = A
+    type Out = A
   }
 
   implicit def dependentMapDecoder[F[_], G[_]](
@@ -116,8 +116,8 @@ abstract private[jjm] class DependentMapInstances {
         val key = keyDecoder(keyStr).get // TODO aah replace the get
         val value = dependentDecoder(key).tryDecode(c.downField(keyStr))
         val foo = Foo(key)
-        type Arg = foo.Arg
-        value.map(v => m.put[Arg](key.asInstanceOf[F[Arg]], v.asInstanceOf[G[Arg]]))
+        type Out = foo.Out
+        value.map(v => m.put[Out](key.asInstanceOf[F[Out]], v.asInstanceOf[G[Out]]))
       }
     }
   }
