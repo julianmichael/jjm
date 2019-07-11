@@ -31,5 +31,4 @@ package object jjm {
 
   type DependentEncoder[F[_], G[_]] = F ~> λ[A => Encoder[G[A]]]
   type DependentDecoder[F[_], G[_]] = F ~> λ[A => Decoder[G[A]]]
-
 }

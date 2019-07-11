@@ -18,6 +18,9 @@ val monocleVersion = "1.5.1-cats"
 val simulacrumVersion = "0.18.0"
 val shapelessVersion = "2.3.3"
 
+// for inflection dictionary; TODO roll my own to be cross-platform and avoid the dep
+val trove4jVersion = "3.0.1"
+
 // for IO and possibly some generic stuff
 val catsEffectVersion = "1.3.1"
 // val kittensVersion = "1.1.1"
@@ -82,7 +85,6 @@ trait JvmPlatform extends CommonModule {
 }
 
 trait CommonPublishModule extends CommonModule with PublishModule {
-  // def artifactName = "spacro"
   def publishVersion = thisPublishVersion
   def pomSettings = PomSettings(
     description = artifactName(),
@@ -102,7 +104,11 @@ object core extends Module {
     def artifactName = "jjm-core"
     def millSourcePath = build.millSourcePath / "jjm"
   }
-  class Jvm(val crossScalaVersion: String) extends CoreModule with JvmPlatform
+  class Jvm(val crossScalaVersion: String) extends CoreModule with JvmPlatform {
+    override def ivyDeps = super.ivyDeps() ++ Agg(
+      ivy"net.sf.trove4j:trove4j:$trove4jVersion"
+    )
+  }
   object jvm extends Cross[Jvm](scalaVersions: _*)
   class Js(val crossScalaVersion: String) extends CoreModule with JsPlatform
   object js extends Cross[Js](scalaVersions: _*)
@@ -122,10 +128,10 @@ object io extends Module {
     def moduleDeps = List(core.jvm(crossScalaVersion))
   }
   object jvm extends Cross[Jvm](scalaVersions: _*)
-  // class Js(val crossScalaVersion: String) extends IOModule with JsPlatform {
-  //   def moduleDeps = List(core.js(crossScalaVersion))
-  // }
-  // object js extends Cross[Js](scalaVersions: _*)
+  class Js(val crossScalaVersion: String) extends IOModule with JsPlatform {
+    def moduleDeps = List(core.js(crossScalaVersion))
+  }
+  object js extends Cross[Js](scalaVersions: _*)
 }
 
 class CoreNLPModule(val crossScalaVersion: String) extends CommonPublishModule with JvmPlatform {
@@ -135,7 +141,7 @@ class CoreNLPModule(val crossScalaVersion: String) extends CommonPublishModule w
   override def ivyDeps = super.ivyDeps() ++ Agg(
     ivy"edu.stanford.nlp:stanford-corenlp:$corenlpVersion",
     ivy"edu.stanford.nlp:stanford-corenlp:$corenlpVersion".configure(
-      coursier.core.Attributes(`type` = "", classifier = "models")
+      coursier.core.Attributes(`type` = coursier.core.Type(""), classifier = coursier.core.Classifier("models"))
     ),
   )
   def moduleDeps = List(core.jvm(crossScalaVersion))

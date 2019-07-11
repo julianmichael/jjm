@@ -3,7 +3,9 @@ package jjm.ling.en
 import jjm.LowerCaseString
 import jjm.implicits._
 
-case class InflectedForms(
+import io.circe.generic.JsonCodec
+
+@JsonCodec case class InflectedForms(
   stem: LowerCaseString,
   present: LowerCaseString,
   presentParticiple: LowerCaseString,

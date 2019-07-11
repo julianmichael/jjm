@@ -3,6 +3,7 @@ package jjm.ling
 import cats.Order
 import cats.Semigroup
 import cats.Show
+import cats.TraverseFilter
 import cats.implicits._
 
 import io.circe.Encoder
@@ -17,6 +18,15 @@ sealed trait Span {
   def contains(i: Int): Boolean
   def toInclusive: ISpan
   def toExclusive: ESpan
+  def getSlice[F[_]: TraverseFilter, A](sequence: F[A]): F[A] = {
+    // TODO make this more efficient
+    val traverse = implicitly[TraverseFilter[F]].traverse
+    traverse.map(
+      traverse.zipWithIndex(sequence)
+        .filter(p => contains(p._2)
+        )
+    )(_._1)
+  }
 }
 object Span {
   // use ISpan and ESpan apply methods instead, unless you want to restrict imports or something.

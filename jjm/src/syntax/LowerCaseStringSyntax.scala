@@ -8,7 +8,7 @@ trait LowerCaseStringSyntax0 {
   // low-pri conversion to make it easy to use in place of strings
   implicit def lowerCaseStringToString(s: LowerCaseString): String = LowerCaseString.toString(s)
 }
-trait LowerCaseStringSyntax {
+trait LowerCaseStringSyntax extends LowerCaseStringSyntax0 {
   implicit def toStringOps(s: String): LowerCaseString.StringOps = {
     LowerCaseString.getStringOps(s)
   }
