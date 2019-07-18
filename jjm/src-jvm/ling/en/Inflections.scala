@@ -42,7 +42,7 @@ class Inflections(private[this] val inflDict: VerbInflectionDictionary) {
       )
       InflectedForms(
         stem = forms(0),
-        present = forms(1),
+        presentSingular3rd = forms(1),
         presentParticiple = forms(2),
         past = forms(3),
         pastParticiple = forms(4)

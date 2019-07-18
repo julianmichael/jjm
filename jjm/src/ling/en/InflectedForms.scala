@@ -7,15 +7,16 @@ import io.circe.generic.JsonCodec
 
 @JsonCodec case class InflectedForms(
   stem: LowerCaseString,
-  present: LowerCaseString,
+  presentSingular3rd: LowerCaseString,
   presentParticiple: LowerCaseString,
   past: LowerCaseString,
   pastParticiple: LowerCaseString
-) extends (VerbForm => LowerCaseString) {
+) {
 
+  import VerbForm._
   def apply(form: VerbForm): LowerCaseString = form match {
     case Stem               => stem
-    case PresentSingular3rd => present
+    case PresentSingular3rd => presentSingular3rd
     case PresentParticiple  => presentParticiple
     case Past               => past
     case PastParticiple     => pastParticiple
@@ -23,30 +24,30 @@ import io.circe.generic.JsonCodec
 
   def getForm(verb: LowerCaseString): Option[VerbForm] =
     if (verb == stem) Some(Stem)
-    else if (verb == present) Some(PresentSingular3rd)
+    else if (verb == presentSingular3rd) Some(PresentSingular3rd)
     else if (verb == presentParticiple) Some(PresentParticiple)
     else if (verb == past) Some(Past)
     else if (verb == pastParticiple) Some(PastParticiple)
     else None
 
   def allForms: List[LowerCaseString] =
-    List(stem, present, presentParticiple, past, pastParticiple)
+    List(stem, presentSingular3rd, presentParticiple, past, pastParticiple)
 
-  override def toString = s"InflectedForms($stem, $present, $presentParticiple, $past, $pastParticiple)"
+  override def toString = s"InflectedForms($stem, $presentSingular3rd, $presentParticiple, $past, $pastParticiple)"
 }
 
 object InflectedForms {
 
   def fromStrings(
     stem: String,
-    present: String,
+    presentSingular3rd: String,
     presentParticiple: String,
     past: String,
     pastParticiple: String
   ) =
     InflectedForms(
       stem.lowerCase,
-      present.lowerCase,
+      presentSingular3rd.lowerCase,
       presentParticiple.lowerCase,
       past.lowerCase,
       pastParticiple.lowerCase
@@ -64,5 +65,4 @@ object InflectedForms {
     "had",
     "had"
   )
-
 }

@@ -14,10 +14,13 @@ import io.circe.syntax._
 // data should not generally be passed around in this form.
 // hence why we don't have any instances except Show.
 sealed trait Span {
-  def length: Int
-  def contains(i: Int): Boolean
-  def toInclusive: ISpan
-  def toExclusive: ESpan
+  def begin: Int
+  def endInclusive: Int
+  def endExclusive: Int
+  def length: Int = endExclusive - begin
+  def contains(i: Int) = begin <= i && i < endExclusive
+  def toInclusive: ISpan = ISpan(begin, endInclusive)
+  def toExclusive: ESpan = ESpan(begin, endExclusive)
   def getSlice[F[_]: TraverseFilter, A](sequence: F[A]): F[A] = {
     // TODO make this more efficient
     val traverse = implicitly[TraverseFilter[F]].traverse
@@ -29,22 +32,26 @@ sealed trait Span {
   }
 }
 object Span {
-  // use ISpan and ESpan apply methods instead, unless you want to restrict imports or something.
+  // These are here if you want them, but I generally
+  // use ISpan and ESpan apply methods instead.
+  // But maybe you want to restrict imports or something.
   def inclusive(begin: Int, end: Int) = ISpan(begin, end)
   def exclusive(begin: Int, end: Int) = ESpan(begin, end)
 
   // will do the same as a subclass Show anyway
   implicit val spanShow: Show[Span] = Show.show[Span](_.toString)
+
+  // We don't include a JSON codec for general Span, because
+  // you should specify whether you expect to read in an inclusive or exclusive one.
+  // general Span reader assuming either is asking for bugs.
 }
 
-// index-inclusive span
+// end-index-inclusive span
 sealed trait ISpan extends Span {
-  def begin: Int
   def end: Int
-  final def length = end - begin + 1
-  final def contains(i: Int) = begin <= i && i <= end
-  final def toInclusive: ISpan = this
-  final def toExclusive: ESpan = ESpan(begin, end + 1)
+  final def endInclusive = end
+  final def endExclusive = end + 1
+  final override def toInclusive: ISpan = this
 }
 
 object ISpan {
@@ -61,7 +68,10 @@ object ISpan {
   }
 
   implicit val ispanDecoder: Decoder[ISpan] = Decoder.instance { c =>
-    c.as[List[Int]].map(l => ISpan(l(0), l(1)))
+    for {
+      begin <- c.downN(0).as[Int].right
+      end   <- c.downN(1).as[Int].right
+    } yield ISpan(begin, end)
   }
 
   implicit val ispanShow: Show[ISpan] = Show.show[ISpan](_.toString)
@@ -71,19 +81,19 @@ object ISpan {
     Order.by[ISpan, Int](_.end),
   )
 
+  implicit val ispanOrdering: Ordering[ISpan] = ispanOrder.toOrdering
+
   implicit val ispanSemigroup: Semigroup[ISpan] = new Semigroup[ISpan] {
     def combine(x: ISpan, y: ISpan) = ISpan(math.min(x.begin, y.begin), math.max(x.end, y.end))
   }
 }
 
-// end index-exclusive span
+// end-index-exclusive span
 sealed trait ESpan extends Span {
-  def begin: Int
   def end: Int
-  final def length = end - begin
-  final def contains(i: Int) = begin <= i && i < end
-  final def toInclusive: ISpan = ISpan(begin, end - 1)
-  final def toExclusive: ESpan = this
+  final def endInclusive = end - 1
+  final def endExclusive = end
+  final override def toExclusive: ESpan = this
 }
 
 object ESpan {
@@ -104,15 +114,20 @@ object ESpan {
   }
 
   implicit val espanDecoder: Decoder[ESpan] = Decoder.instance { c =>
-    c.as[List[Int]].map(l => ESpan(l(0), l(1)))
+    for {
+      begin <- c.downN(0).as[Int].right
+      end   <- c.downN(1).as[Int].right
+    } yield ESpan(begin, end)
   }
 
   implicit val espanShow: Show[ESpan] = Show.show[ESpan](_.toString)
 
   implicit val espanOrder: Order[ESpan] = Order.whenEqual(
     Order.by[ESpan, Int](_.begin),
-    Order.by[ESpan, Int](_.end),
-    )
+    Order.by[ESpan, Int](_.end)
+  )
+
+  implicit val espanOrdering: Ordering[ESpan] = espanOrder.toOrdering
 
   implicit val espanSemigroup: Semigroup[ESpan] = new Semigroup[ESpan] {
     def combine(x: ESpan, y: ESpan) = ESpan(math.min(x.begin, y.begin), math.max(x.end, y.end))

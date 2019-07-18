@@ -11,6 +11,7 @@ val macroParadiseVersion = "2.1.0"
 val kindProjectorVersion = "0.9.4"
 // val splainVersion = "0.3.4"
 
+// --- core deps ---
 // cats libs -- maintain version agreement or whatever
 val catsVersion = "1.6.1"
 val circeVersion = "0.11.1"
@@ -21,11 +22,14 @@ val shapelessVersion = "2.3.3"
 // for inflection dictionary; TODO roll my own to be cross-platform and avoid the dep
 val trove4jVersion = "3.0.1"
 
-// for IO and possibly some generic stuff
+// --- io deps ---
 val catsEffectVersion = "1.3.1"
 // val kittensVersion = "1.1.1"
 val fs2Version = "1.0.4"
+val scalajsDomVersion = "0.9.6"
+val http4sVersion = "0.20.6"
 
+// --- corenlp deps ---
 val corenlpVersion = "3.6.0"
 
 // maybe use for HTTP service hookup thing
@@ -120,16 +124,24 @@ object io extends Module {
     def millSourcePath = build.millSourcePath / "jjm-io"
     override def ivyDeps = super.ivyDeps() ++ Agg(
       ivy"org.typelevel::cats-effect::$catsEffectVersion",
-      ivy"co.fs2::fs2-core::$fs2Version",
-      ivy"co.fs2::fs2-io::$fs2Version"
+      ivy"co.fs2::fs2-core::$fs2Version"
     )
   }
   class Jvm(val crossScalaVersion: String) extends IOModule with JvmPlatform {
     def moduleDeps = List(core.jvm(crossScalaVersion))
+    override def ivyDeps = super.ivyDeps() ++ Agg(
+      ivy"co.fs2::fs2-io::$fs2Version",
+      ivy"org.http4s::http4s-dsl::$http4sVersion",
+      ivy"org.http4s::http4s-blaze-server::$http4sVersion",
+      ivy"org.http4s::http4s-circe::$http4sVersion"
+    )
   }
   object jvm extends Cross[Jvm](scalaVersions: _*)
   class Js(val crossScalaVersion: String) extends IOModule with JsPlatform {
     def moduleDeps = List(core.js(crossScalaVersion))
+    override def ivyDeps = super.ivyDeps() ++ Agg(
+      ivy"org.scala-js::scalajs-dom::$scalajsDomVersion"
+    )
   }
   object js extends Cross[Js](scalaVersions: _*)
 }

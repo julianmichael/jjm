@@ -4,9 +4,9 @@ import cats.implicits._
 import cats.data.NonEmptyList
 import cats.effect.{ContextShift, ExitCode, IO, IOApp, Resource}
 
-import io.circe.jawn
-import io.circe.{Encoder, Decoder}
-import io.circe.Printer
+import _root_.io.circe.jawn
+import _root_.io.circe.{Encoder, Decoder}
+import _root_.io.circe.Printer
 
 import fs2.Stream
 
@@ -58,7 +58,7 @@ object FileUtil {
   }
 
   def writeJson[A: Encoder](path: NIOPath, printer: Printer = io.circe.Printer.noSpaces)(a: A): IO[Unit] = {
-    import io.circe.syntax._
+    import _root_.io.circe.syntax._
     IO(Option(path.getParent).foreach(java.nio.file.Files.createDirectories(_))) >>
       IO(java.nio.file.Files.write(path, printer.pretty(a.asJson).getBytes("UTF-8")))
   }
@@ -66,7 +66,7 @@ object FileUtil {
   def writeJsonLines[A](path: NIOPath, printer: Printer = io.circe.Printer.noSpaces)(as: Seq[A])(
     implicit cs: ContextShift[IO], encoder: Encoder[A]
   ): IO[Unit] = {
-    import io.circe.syntax._
+    import _root_.io.circe.syntax._
     IO(Option(path.getParent).foreach(java.nio.file.Files.createDirectories(_))) >>
       Stream.resource(blockingExecutionContext).flatMap { _ec =>
         Stream.emits[IO, A](as)
