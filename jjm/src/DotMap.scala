@@ -20,7 +20,7 @@ import monocle.function.At
 import monocle.function.Index
 
 // TODO maybe use a different name for the F[_] version and DotMap for F = Id?
-final class DotMap[F[_], A <: Dot] private (private val map: Map[A, F[_]]) {
+class DotMap[F[_], A <: Dot] private (private val map: Map[A, F[_]]) {
 
   def get(key: A): Option[F[key.Out]] =
     map.get(key).asInstanceOf[Option[F[key.Out]]]
@@ -33,9 +33,6 @@ final class DotMap[F[_], A <: Dot] private (private val map: Map[A, F[_]]) {
 
   def remove(key: A): DotMap[F, A] =
     new DotMap[F, A](map - key)
-
-  def keys: Iterable[A] =
-    map.keys
 
   def keySet: Set[A] =
     map.keySet
@@ -67,6 +64,9 @@ final class DotMap[F[_], A <: Dot] private (private val map: Map[A, F[_]]) {
       override def apply[B](fa: DotF[A]#Aux[B]): Option[F[B]] =
         get(fa)
     }
+
+  def withDefault(f: DotKleisli[F, A]): TotalDotMap[F, A] =
+    new TotalDotMap(map.withDefault(f.apply(_)))
 }
 
 object DotMap extends DotMapInstances {
@@ -88,7 +88,7 @@ abstract private[jjm] class DotMapInstances extends DotMapInstances0 {
   //     x.map == y.map
   // }
 
-  // TODO: commutative monoid/semigroup, and anything else from Cats...
+  // TODO: semigroupK, commutative monoid/semigroup, and anything else from Cats
 
   implicit def dotMapMonoid[F[_], A <: Dot](
     implicit dotMonoid: DotKleisli[λ[B => Monoid[F[B]]], A]
@@ -97,7 +97,7 @@ abstract private[jjm] class DotMapInstances extends DotMapInstances0 {
       override def empty =
         DotMap.empty[F, A]
       override def combine(x: DotMap[F, A], y: DotMap[F, A]) = {
-        (x.keys ++ y.keys).toSet.foldLeft(empty) {
+        (x.keySet ++ y.keySet).foldLeft(empty) {
           case (dMap, key) => dMap.put(key) {
             implicit val m = dotMonoid(key)
             (x.get(key).combineAll |+| y.get(key).combineAll)
@@ -112,9 +112,9 @@ abstract private[jjm] class DotMapInstances extends DotMapInstances0 {
   ): Encoder[DotMap[F, A]] = new Encoder[DotMap[F, A]] {
     final def apply(m: DotMap[F, A]) = Json.obj(
       // TODO would be best if I can iterate over DotPairs but I can't seem to get those to work
-      m.keys.map(key =>
+      m.keySet.toList.map(key =>
         keyEncoder(key) -> dotEncoder(key)(m.get(key).get)
-      ).toSeq: _*
+      ): _*
     )
   }
 
@@ -165,7 +165,7 @@ sealed trait DotMapInstances0 extends DotMapInstances1 {
     new Monoid[DotMap[F, A]] {
       override def empty = DotMap.empty[F, A]
       override def combine(x: DotMap[F, A], y: DotMap[F, A]) = {
-        (x.keys ++ y.keys).toSet.foldLeft(DotMap.empty[F, A]) {
+        (x.keySet ++ y.keySet).foldLeft(DotMap.empty[F, A]) {
           case (dMap, key) => dMap.put(key) {
             (x.get(key).foldK <+> y.get(key).foldK)
           }
@@ -180,7 +180,7 @@ sealed trait DotMapInstances1 {
   ): Semigroup[DotMap[F, A]] =
     new Semigroup[DotMap[F, A]] {
       override def combine(x: DotMap[F, A], y: DotMap[F, A]) = {
-        (x.keys ++ y.keys).toSet.foldLeft(DotMap.empty[F, A]) {
+        (x.keySet ++ y.keySet).foldLeft(DotMap.empty[F, A]) {
           case (dMap, key) => dMap.put(key) {
             implicit val m = dotSemigroup(key)
             (x.get(key), y.get(key)) match {

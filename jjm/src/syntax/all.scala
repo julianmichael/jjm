@@ -6,5 +6,6 @@ trait AllSyntax
     with LowerCaseStringSyntax
     with StdSyntax
     with TokenSyntax
+    with jjm.Finite.ToFiniteOps
 
 object all extends AllSyntax

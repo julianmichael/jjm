@@ -2,9 +2,19 @@ package jjm
 
 import cats.Id
 
+import scala.reflect.runtime.universe.TypeTag
+
 sealed trait DotPair[F[_], A <: Dot] extends Product with Serializable {
   val fst: A
   val snd: F[fst.Out]
+
+  def get[B <: A](cand: B): Option[F[cand.Out]] = {
+    if(fst == cand) Some(snd.asInstanceOf[F[cand.Out]])
+    else None
+  }
+
+  def widen[B >: A <: Dot]: DotPair[F, B] =
+    this.asInstanceOf[DotPair[F, B]]
 }
 
 object DotPair {
@@ -29,6 +39,7 @@ object DotPair {
 
   import io.circe.Encoder
   import io.circe.Decoder
+  import io.circe.HCursor
   import io.circe.syntax._
 
   implicit def dotPairEncoder[F[_], A <: Dot](
@@ -39,15 +50,17 @@ object DotPair {
     List(pair.fst.asJson, pair.snd.asJson).asJson
   }
 
-  // TODO
-  // implicit def dotMapDecoder[F[_], A <: Dot](
-  //   implicit fstDecoder: Decoder[A],
-  //   sndDotDecoder: DotKleisli[λ[B => Decoder[F[B]]], A]
-  // ): Decoder[DotPair[F, A]] = new Decoder[DotPair[F, A]] {
-  //   final def apply(c: HCursor): Decoder.Result[DotPair[F, A]] = {
-  //     ???
-  //   }
-  // }
+  // TODO make sure this works
+  implicit def dotPairDecoder[F[_], A <: Dot](
+    implicit fstDecoder: Decoder[A],
+    sndDotDecoder: DotKleisli[λ[B => Decoder[F[B]]], A]
+  ): Decoder[DotPair[F, A]] = new Decoder[DotPair[F, A]] {
+    final def apply(c: HCursor): Decoder.Result[DotPair[F, A]] = for {
+      fstValue <- fstDecoder.tryDecode(c.downN(0))
+      sndDecoder = sndDotDecoder(fstValue)
+      sndValue <- sndDecoder.tryDecode(c.downN(1))
+    } yield DotPair[F](fstValue)(sndValue.asInstanceOf[F[fstValue.Out]])
+  }
 
   // TODO cats instances
   // monocle instances probably aren't possible...? maybe with singleton types? TODO try it out

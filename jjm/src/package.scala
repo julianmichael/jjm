@@ -13,6 +13,8 @@ package object jjm {
 
   type DotFunction[A <: Dot] = DotKleisli[Id, A]
 
+  type DotFunctionK[F[_], A <: Dot] = DotF[A]#Aux ~> F
+
   sealed trait DotUnit extends Product with Serializable {
     final type Out = Unit
   }

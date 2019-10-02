@@ -27,7 +27,7 @@ val catsEffectVersion = "1.3.1"
 // val kittensVersion = "1.1.1"
 val fs2Version = "1.0.4"
 val scalajsDomVersion = "0.9.6"
-val http4sVersion = "0.20.6"
+val http4sVersion = "0.20.11"
 
 // --- corenlp deps ---
 val corenlpVersion = "3.6.0"

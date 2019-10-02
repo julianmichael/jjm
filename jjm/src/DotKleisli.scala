@@ -17,6 +17,13 @@ trait DotKleisli[F[_], A <: Dot] { self =>
     new DotKleisli[G, A] { def apply(a: A): G[a.Out] = dotTrans(a)(self(a)) }
 
   // TODO composeDotK
+
+  def toFunctionK: DotFunctionK[F, A] = new DotFunctionK[F, A] {
+    def apply[B](dot: A { type Out = B }) = self(dot)
+  }
+
+  def toDotKleisliGraph(implicit fin: Finite[A]) =
+    DotKleisliGraph.fromDotKleisli(this)
 }
 
 object DotKleisli {
@@ -24,5 +31,12 @@ object DotKleisli {
     override def apply(a: DotUnit) = ()
   }
 
-  // TODO: instances for any typeclasses that come to mind
+  def fromFunctionK[F[_], A <: Dot](f: DotFunctionK[F, A]) =
+    new DotKleisli[F, A] {
+      @inline def apply(a: A): F[a.Out] = _apply[a.Out](a)
+      @inline private[this] def _apply[B](req: A { type Out = B }): F[B] = f(req)
+    }
+
+
+  // TODO: typeclass instances
 }
