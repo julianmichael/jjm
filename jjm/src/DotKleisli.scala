@@ -9,6 +9,11 @@ trait DotKleisli[F[_], A <: Dot] { self =>
   // TODO: compose (flat), composeF (nested), composeM (monadic), ...?
   // can these even be implemented? bc of the issue of having a value-level map between Dots
 
+  // TODO sequencing and binding under the dot
+
+  // TODO pair results
+  // def product[G[_]]
+
   def andThenK[G[_]](trans: F ~> G): DotKleisli[G, A] =
     new DotKleisli[G, A] { def apply(a: A): G[a.Out] = trans(self(a)) }
 
@@ -37,6 +42,13 @@ object DotKleisli {
       @inline private[this] def _apply[B](req: A { type Out = B }): F[B] = f(req)
     }
 
+  // TODO does this make any sense
+
+  // type Const[C, A] = C
+
+  // def const[F[_], A <: Dot, C](c: F[C]) = new DotKleisli[Lambda[B => F[Const[C, ?]]], A] {
+  //   def apply(a: A): Const[C, a.Out] = c
+  // }
 
   // TODO: typeclass instances
 }
