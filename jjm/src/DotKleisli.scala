@@ -1,7 +1,9 @@
 package jjm
 
-import cats.Id
 import cats.~>
+import cats.Id
+import cats.FlatMap
+import cats.implicits._
 
 trait DotKleisli[F[_], A <: Dot] { self =>
   def apply(a: A): F[a.Out]
@@ -22,10 +24,30 @@ trait DotKleisli[F[_], A <: Dot] { self =>
     new DotKleisli[G, A] { def apply(a: A): G[a.Out] = dotTrans(a)(self(a)) }
 
   // TODO composeDotK
+  
+  def dotFlatMap[G[_]](
+    f: DotKleisli[λ[B => B => F[G[B]]], A])(
+    implicit fm: FlatMap[F]
+  ): DotKleisli[λ[B => F[G[B]]], A] =
+    new DotKleisli[λ[B => F[G[B]]], A] { def apply(a: A): F[G[a.Out]] = self(a).flatMap(f(a)) }
+
+  def dotFlatTap(
+    f: DotKleisli[λ[B => B => F[Unit]], A])(
+    implicit fm: FlatMap[F]
+  ): DotKleisli[F, A] =
+    new DotKleisli[F, A] { def apply(a: A): F[a.Out] = self(a).flatTap(f(a)) }
 
   def toFunctionK: DotFunctionK[F, A] = new DotFunctionK[F, A] {
     def apply[B](dot: A { type Out = B }) = self(dot)
   }
+
+  def toFunction[B](
+    f: DotKleisli[λ[A => F[A] => B], A]
+  ): A => B = (a: A) => f(a)(self(a))
+
+  def toFunction[B](
+    f: F ~> λ[A => B]
+  ): A => B = (a: A) => f(self(a))
 
   def toDotKleisliGraph(implicit fin: Finite[A]) =
     DotKleisliGraph.fromDotKleisli(this)
