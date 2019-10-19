@@ -1,5 +1,6 @@
 package jjm
 
+import cats.~>
 import cats.Applicative
 import cats.Monad
 import cats.StackSafeMonad
@@ -17,9 +18,16 @@ sealed trait OrWrapped[F[_], A] {
 
   def wrap(f: A => F[A]): F[A] = cata(f, identity)
   def wrapPure(implicit A: Applicative[F]): F[A] = cata(A.pure, identity)
+  def mapK[G[_]](f: F ~> G): OrWrapped[G, A] = cata(
+    OrWrapped.pure[G](_),
+    fa => OrWrapped.wrapped[G, A](f(fa))
+  )
 }
 
 object OrWrapped {
+  def mapK[F[_], G[_]](f: F ~> G): OrWrapped[F, ?] ~> OrWrapped[G, ?] =
+    λ[OrWrapped[F, ?] ~> OrWrapped[G, ?]](_.mapK(f))
+
   case class Pure[F[_], A](value: A) extends OrWrapped[F, A]
   object Pure {
     def value[F[_], A] = Iso[Pure[F, A], A](_.value)(Pure.apply[F, A])

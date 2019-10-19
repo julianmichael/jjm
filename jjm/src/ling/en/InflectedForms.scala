@@ -53,6 +53,10 @@ object InflectedForms {
       pastParticiple.lowerCase
     )
 
+  val generic = InflectedForms.fromStrings(
+    "stem", "presentSingular3rd", "presentParticiple", "past", "pastParticiple"
+  )
+
   val doForms = InflectedForms.fromStrings("do", "does", "doing", "did", "done")
 
   val beSingularForms =

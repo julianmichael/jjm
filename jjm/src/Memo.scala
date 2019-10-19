@@ -37,27 +37,34 @@ object Memo {
     }
   }
 
+  type DelayedFuture[A] = () => Future[A]
+
   // see caveats in previous method regarding single-time execution
+  // for thread-safety, you should pass in an execution context that makes
+  // sure all cache updates are run on a single thread.
   def memoizeDotFuture[A <: Dot](
-    f: DotKleisli[Future, A],
+    f: DotKleisli[DelayedFuture, A],
     startingCache: DotMap[Id, A] = DotMap.empty[Id, A]
-  ): DotKleisli[OrWrapped[Future, ?], A] = {
-    // for thread-safety, make sure all cache updates are run on a single thread
-    import java.util.concurrent.Executors
-    implicit val ec = ExecutionContext.fromExecutorService(Executors.newSingleThreadExecutor)
+  )(implicit ec: ExecutionContext): DotKleisli[OrWrapped[DelayedFuture, ?], A] = {
     var futCache = DotMap.empty[Future, A]
     var cache = startingCache
-    new DotKleisli[OrWrapped[Future, ?], A] {
+    new DotKleisli[OrWrapped[DelayedFuture, ?], A] {
       override def apply(a: A) = {
-        cache.get(a).map(OrWrapped.pure[Future](_)).getOrElse {
-          futCache.get(a).map(OrWrapped.wrapped(_)).getOrElse {
-            val bFut = f(a)
-            futCache = futCache.put(a)(bFut)
-            bFut.foreach { b =>
-              cache = cache.put(a)(b)
-              futCache = futCache.remove(a)
-            }
-            OrWrapped.wrapped(bFut)
+        cache.get(a).map(OrWrapped.pure[DelayedFuture](_)).getOrElse {
+          futCache.get(a).map[OrWrapped[DelayedFuture, a.Out]](
+            fut => OrWrapped.wrapped[DelayedFuture, a.Out](() => fut)
+          ).getOrElse[OrWrapped[DelayedFuture, a.Out]] {
+            OrWrapped.wrapped[DelayedFuture, a.Out](
+              () => {
+                val bFut = f(a)()
+                futCache = futCache.put(a)(bFut)
+                bFut.foreach { b =>
+                  cache = cache.put(a)(b)
+                  futCache = futCache.remove(a)
+                }
+                bFut
+              }
+            )
           }
         }
       }

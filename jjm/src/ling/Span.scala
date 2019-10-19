@@ -19,6 +19,9 @@ sealed trait Span {
   def endExclusive: Int
   def length: Int = endExclusive - begin
   def contains(i: Int) = begin <= i && i < endExclusive
+  def overlaps(that: Span): Boolean = {
+    this.begin < that.endExclusive && that.begin < this.endExclusive
+  }
   def toInclusive: ISpan = ISpan(begin, endInclusive)
   def toExclusive: ESpan = ESpan(begin, endExclusive)
   def getSlice[F[_]: TraverseFilter, A](sequence: F[A]): F[A] = {

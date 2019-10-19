@@ -36,60 +36,30 @@ trait CatsSyntax {
           else (trues, total + 1)
       } match { case (trues, total) => trues.toDouble / total }
 
-  }
+    def maxima(implicit o: Order[A]): List[A] =
+      fa.foldLeft(List.empty[A]) { (maxes, a) =>
+        maxes.headOption.fold(a :: Nil) { max =>
+          if(a > max) a :: Nil
+          else if(a.eqv(max)) a :: maxes
+          else maxes
+        }
+      }.reverse
 
-  implicit class RichNonEmptyList[A](val as: NonEmptyList[A]) { // TODO AnyVal
+    def maximaBy[B: Order](f: A => B): List[A] =
+      fa.foldLeft(List.empty[(A, B)]) { (maxes, a) =>
+        val key = f(a)
+        maxes.headOption.fold((a -> key) :: Nil) { case (_, maxKey) =>
+          if(key > maxKey) (a -> key) :: Nil
+          else if(key < maxKey) maxes
+          else (a -> key) :: maxes
+        }
+      }.reverse.map(_._1)
 
-    def partition[B, C](f: A => Either[B, C]): Ior[NonEmptyList[B], NonEmptyList[C]] = {
-      val init = f(as.head).fold(
-        b => Ior.Left(NonEmptyList.of(b)),
-        c => Ior.Right(NonEmptyList.of(c))
-      ): Ior[NonEmptyList[B], NonEmptyList[C]]
-      as.tail.map(f).foldLeft(init) {
-        case (Ior.Left(bs), Left(b))      => Ior.Left(b :: bs)
-        case (Ior.Right(cs), Left(b))     => Ior.Both(NonEmptyList.of(b), cs)
-        case (Ior.Both(bs, cs), Left(b))  => Ior.Both(b :: bs, cs)
-        case (Ior.Left(bs), Right(c))     => Ior.Both(bs, NonEmptyList.of(c))
-        case (Ior.Right(cs), Right(c))    => Ior.Right(c :: cs)
-        case (Ior.Both(bs, cs), Right(c)) => Ior.Both(bs, c :: cs)
-      }
-    }
+    def minima(implicit o: Order[A]): List[A] =
+      maxima(Order.reverse(o))
 
-    // taken from latest cats; holdover until version upgrade
-    def sorted[AA >: A](implicit AA: Order[AA]): NonEmptyList[AA] = {
-      NonEmptyList.fromListUnsafe(as.toList.sorted(AA.toOrdering))
-    }
-
-    // taken from latest cats; holdover until version upgrade
-    def init: List[A] = as.tail match {
-      case Nil => Nil
-      case t   => as.head :: t.init
-    }
-
-    // taken from latest cats; holdover until version upgrade
-    def last: A = as.tail.lastOption match {
-      case None    => as.head
-      case Some(a) => a
-    }
-
-  }
-
-  implicit class RichNonEmptyListCompanion(val nel: NonEmptyList.type) { // TODO AnyVal
-
-    // taken from latest cats; holdover until version upgrade
-    def ofInitLast[A](init: List[A], last: A): NonEmptyList[A] =
-      init match {
-        case Nil    => NonEmptyList(last, Nil)
-        case h :: t => NonEmptyList(h, t :+ last)
-      }
-  }
-
-  // taken from latest cats; holdover until version upgrade
-  implicit class RichArrow[F[_, _], A, B](val f: F[A, B])(implicit F: Arrow[F]) {
-
-    def &&&[C](g: F[A, C]): F[A, (B, C)] = {
-      F.andThen(F.lift((x: A) => (x, x)), F.split(f, g))
-    }
+    def minimaBy[B](f: A => B)(implicit o: Order[B]): List[A] =
+      maximaBy(f)(Order.reverse(o))
   }
 
   implicit class RichIorSame[A](val ior: Ior[A, A]) { // TODO AnyVal
@@ -99,6 +69,16 @@ trait CatsSyntax {
       f
     )
   }
+
+  // TODO
+  // implicit class RichNonEmptyList[A](val x: NonEmptyList[A]) { // TODO AnyVal
+  //   def maximaNel(implicit o: Order[A]): NonEmptyList[A]
+  //   def maximaNelBy[B](f: A => B)(implicit o: Order[B]): NonEmptyList[A]
+  //   def minimaNel(implicit o: Order[A]): NonEmptyList[A] =
+  //     maximaNel(o.reverse)
+  //   def minimaNelBy[B](f: A => B)(implicit o: Order[B]): NonEmptyList[A] =
+  //     maximaNelBy(f)(o.reverse)
+  // }
 
   implicit class CatsRichMap[A, B](val x: Map[A, B]) { // TODO AnyVal
     // superseded by `Align` once that's in cats
