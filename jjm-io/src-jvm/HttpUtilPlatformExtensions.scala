@@ -2,6 +2,7 @@ package jjm.io
 
 import jjm.Dot
 import jjm.DotEncoder
+import jjm.DotDecoder
 import jjm.DotKleisli
 
 // import cats.Functor
@@ -9,10 +10,28 @@ import cats.effect.Effect
 import cats.implicits._
 
 import _root_.io.circe.{Encoder, Decoder}
+import _root_.io.circe.Json
 
 import org.http4s._
+import org.http4s.client.Client
 
 trait HttpUtilPlatformExtensions {
+  def makeHttpPostClient[F[_]: Effect, Req <: Dot : Encoder : DotDecoder](
+    client: Client[F], endpoint: Uri
+  ): DotKleisli[F, Req] = {
+    object dsl extends org.http4s.dsl.Http4sDsl[F]
+    import dsl._
+    import org.http4s.circe._
+    implicit val entityEncoder = jsonEncoderOf[F, Req]
+    new DotKleisli[F, Req] {
+      def apply(req: Req): F[req.Out] = client
+        .fetchAs[Json](Request[F](method = Method.POST, uri = endpoint).withEntity(req))
+        .map(implicitly[DotDecoder[Req]].apply(req).decodeJson(_))
+        .map(_.leftMap(new RuntimeException(_)))
+        .flatMap(Effect[F].fromEither[req.Out](_))
+    }
+  }
+
   def makeHttpPostServer[F[_]: Effect, Req <: Dot : Decoder : DotEncoder](
     backend: DotKleisli[F, Req]
   ): HttpRoutes[F] = {

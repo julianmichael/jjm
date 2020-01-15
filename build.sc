@@ -131,6 +131,7 @@ object io extends Module {
     def moduleDeps = List(core.jvm(crossScalaVersion))
     override def ivyDeps = super.ivyDeps() ++ Agg(
       ivy"co.fs2::fs2-io::$fs2Version",
+      ivy"org.http4s::http4s-client::$http4sVersion",
       ivy"org.http4s::http4s-dsl::$http4sVersion",
       ivy"org.http4s::http4s-blaze-server::$http4sVersion",
       ivy"org.http4s::http4s-circe::$http4sVersion"
