@@ -7,3 +7,4 @@ trait TokenSyntax
     with HasSourceText.ToHasSourceTextOps
     with HasIndex.ToHasIndexOps
     with HasPos.ToHasPosOps
+    with HasLemma.ToHasLemmaOps

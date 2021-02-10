@@ -31,9 +31,11 @@ val trove4jVersion = "3.0.1"
 val catsEffectVersion = "2.3.1"
 val fs2Version = "2.5.0"
 val http4sVersion = "0.21.18"
-
 // js
 val scalajsDomVersion = "1.1.0"
+
+// --- datasets deps ---
+val fastparseVersion = "2.3.1"
 
 // --- corenlp deps ---
 val corenlpVersion = "3.6.0"
@@ -134,6 +136,7 @@ object io extends Module {
       ivy"co.fs2::fs2-core::$fs2Version"
     )
   }
+
   class Jvm(val crossScalaVersion: String) extends IOModule with JvmPlatform {
     def moduleDeps = List(core.jvm(crossScalaVersion))
     override def ivyDeps = super.ivyDeps() ++ Agg(
@@ -145,6 +148,7 @@ object io extends Module {
     )
   }
   object jvm extends Cross[Jvm](scalaVersions: _*)
+
   class Js(val crossScalaVersion: String) extends IOModule with JsPlatform {
     def moduleDeps = List(core.js(crossScalaVersion))
     override def ivyDeps = super.ivyDeps() ++ Agg(
@@ -152,6 +156,42 @@ object io extends Module {
     )
   }
   object js extends Cross[Js](scalaVersions: _*)
+}
+
+object datasets extends Module {
+  trait DatasetsModule extends CommonPublishModule {
+    def artifactName = "jjm-datasets"
+    def millSourcePath = build.millSourcePath / "jjm-datasets"
+    override def ivyDeps = super.ivyDeps() ++ Agg(
+      ivy"com.lihaoyi::fastparse::$fastparseVersion"
+      // ivy"org.typelevel::cats-effect::$catsEffectVersion",
+      // ivy"co.fs2::fs2-core::$fs2Version"
+    )
+  }
+
+  class Js(val crossScalaVersion: String) extends DatasetsModule with JsPlatform {
+    def moduleDeps = List(io.js(crossScalaVersion))
+  }
+  object js extends Cross[Js](scalaVersions: _*)
+
+  class Jvm(val crossScalaVersion: String) extends DatasetsModule with JvmPlatform {
+    def moduleDeps = List(io.jvm(crossScalaVersion))
+    // object test extends Tests {
+    //   def moduleDeps = super.moduleDeps
+    //   override def millSourcePath = datasets.this.millSourcePath / "test"
+    //   override def scalaVersion = jvm.this.scalaVersion
+    //   // def platformSegment = jvm.this.platformSegment
+    //   override def ivyDeps = Agg(
+    //     ivy"org.julianmichael::freelog::$freelogVersion",
+    //     ivy"org.scalatest::scalatest:$scalatestVersion",
+    //     ivy"org.scalacheck::scalacheck:$scalacheckVersion",
+    //     ivy"org.typelevel::discipline-core:$disciplineVersion"
+    //       // ivy"org.typelevel::discipline-scalatest:$disciplineVersion-SNAPSHOT"
+    //   )
+    //   def testFrameworks = Seq("org.scalatest.tools.Framework")
+    // }
+  }
+  object jvm extends Cross[Jvm](scalaVersions: _*)
 }
 
 class CoreNLPModule(val crossScalaVersion: String) extends CommonPublishModule with JvmPlatform {
@@ -167,4 +207,3 @@ class CoreNLPModule(val crossScalaVersion: String) extends CommonPublishModule w
   def moduleDeps = List(core.jvm(crossScalaVersion))
 }
 object corenlp extends Cross[CoreNLPModule](scalaVersions: _*)
-

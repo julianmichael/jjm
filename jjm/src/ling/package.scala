@@ -16,25 +16,6 @@ package object ling {
     def apply(x: String) = Token ->> x :: HNil
     def field(x: String) = Token ->> x
   }
-
-  type SourceText = FieldType[SourceText.type, TokenText]
-  object SourceText {
-    def apply(x: TokenText) = SourceText ->> x :: HNil
-    def field(x: TokenText) = SourceText ->> x
-  }
-
-  type Index = FieldType[Index.type, Int]
-  object Index {
-    def apply(x: Int) = Index ->> x :: HNil
-    def field(x: Int) = Index ->> x
-  }
-
-  type Pos = FieldType[Pos.type, String]
-  object Pos {
-    def apply(x: String) = Pos ->> x :: HNil
-    def field(x: String) = Pos ->> x
-  }
-
   @typeclass trait HasToken[T] {
     def token(t: T): String
   }
@@ -47,6 +28,11 @@ package object ling {
     }
   }
 
+  type SourceText = FieldType[SourceText.type, TokenText]
+  object SourceText {
+    def apply(x: TokenText) = SourceText ->> x :: HNil
+    def field(x: TokenText) = SourceText ->> x
+  }
   @typeclass trait HasSourceText[T] {
     def sourceText(t: T): TokenText
   }
@@ -59,6 +45,11 @@ package object ling {
     }
   }
 
+  type Index = FieldType[Index.type, Int]
+  object Index {
+    def apply(x: Int) = Index ->> x :: HNil
+    def field(x: Int) = Index ->> x
+  }
   @typeclass trait HasIndex[T] {
     def index(t: T): Int
   }
@@ -71,6 +62,11 @@ package object ling {
     }
   }
 
+  type Pos = FieldType[Pos.type, String]
+  object Pos {
+    def apply(x: String) = Pos ->> x :: HNil
+    def field(x: String) = Pos ->> x
+  }
   @typeclass trait HasPos[T] {
     def pos(t: T): String
   }
@@ -82,4 +78,22 @@ package object ling {
       def pos(t: Pos): String = t
     }
   }
+
+  type Lemma = FieldType[Lemma.type, String]
+  object Lemma {
+    def apply(x: String) = Lemma ->> x :: HNil
+    def field(x: String) = Lemma ->> x
+  }
+  @typeclass trait HasLemma[T] {
+    def lemma(t: T): String
+  }
+  object HasLemma {
+    implicit def recordHasLemma[T <: HList : Selector.Aux[*, Lemma.type, String]] = new HasLemma[T] {
+      def lemma(t: T): String = t(Lemma)
+    }
+    implicit val lemmaHasLemma = new HasLemma[Lemma] {
+      def lemma(t: Lemma): String = t
+    }
+  }
+
 }
