@@ -150,10 +150,11 @@ abstract private[jjm] class DotKleisliGraphInstances extends DotKleisliGraphInst
 
   // TODO Traversal over DotPair elements, if we can get DotPair to work...
 
-  implicit def dotKleisliGraphAt[F[_], A <: Dot, Out0]: At[DotKleisliGraph[F, A], A { type Out = Out0 }, F[Out0]] =
+  implicit def dotKleisliGraphAt[
+    F[_], A <: Dot, Out0]: At[DotKleisliGraph[F, A], A { type Out = Out0 }, F[Out0]] =
     At[DotKleisliGraph[F, A], A { type Out = Out0 }, F[Out0]](
-      i => map => map(i))(
-      i => v => map => map.update(i)(v)
+      (i: A { type Out = Out0 }) => (map: DotKleisliGraph[F, A]) => map(i))(
+      (i: A { type Out = Out0 }) => (v: F[Out0]) => (map: DotKleisliGraph[F, A]) => map.update(i)(v)
     )
 }
 

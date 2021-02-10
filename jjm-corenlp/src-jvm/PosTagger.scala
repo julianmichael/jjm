@@ -23,7 +23,7 @@ object PosTagger {
   val posTagCache = collection.mutable.Map.empty[Vector[String], Vector[String]]
 
   /** POS-tags a sequence of tokens. */
-  def posTag[F[_]: Foldable, A <: HList : HasToken : Updater[?, Pos]](s: F[A]) = {
+  def posTag[F[_]: Foldable, A <: HList : HasToken : Updater[*, Pos]](s: F[A]) = {
     val recVec = s.toList.toVector
     val origTokens = recVec.map(_.token)
     // probably we can do that with a tagger parameter...but...how about later..

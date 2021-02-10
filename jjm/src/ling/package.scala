@@ -39,7 +39,7 @@ package object ling {
     def token(t: T): String
   }
   object HasToken {
-    implicit def recordHasToken[T <: HList : Selector.Aux[?, Token.type, String]] = new HasToken[T] {
+    implicit def recordHasToken[T <: HList : Selector.Aux[*, Token.type, String]] = new HasToken[T] {
       def token(t: T): String = t(Token)
     }
     implicit val tokenHasToken = new HasToken[Token] {
@@ -51,7 +51,7 @@ package object ling {
     def sourceText(t: T): TokenText
   }
   object HasSourceText {
-    implicit def recordHasSourceText[T <: HList : Selector.Aux[?, SourceText.type, TokenText]] = new HasSourceText[T] {
+    implicit def recordHasSourceText[T <: HList : Selector.Aux[*, SourceText.type, TokenText]] = new HasSourceText[T] {
       def sourceText(t: T): TokenText = t(SourceText)
     }
     implicit val sourceTextHasSourceText = new HasSourceText[SourceText] {
@@ -63,7 +63,7 @@ package object ling {
     def index(t: T): Int
   }
   object HasIndex {
-    implicit def recordHasIndex[T <: HList : Selector.Aux[?, Index.type, Int]] = new HasIndex[T] {
+    implicit def recordHasIndex[T <: HList : Selector.Aux[*, Index.type, Int]] = new HasIndex[T] {
       def index(t: T): Int = t(Index)
     }
     implicit val indexHasIndex = new HasIndex[Index] {
@@ -75,7 +75,7 @@ package object ling {
     def pos(t: T): String
   }
   object HasPos {
-    implicit def recordHasPos[T <: HList : Selector.Aux[?, Pos.type, String]] = new HasPos[T] {
+    implicit def recordHasPos[T <: HList : Selector.Aux[*, Pos.type, String]] = new HasPos[T] {
       def pos(t: T): String = t(Pos)
     }
     implicit val posHasPos = new HasPos[Pos] {

@@ -124,8 +124,9 @@ abstract private[jjm] class DependentMapInstances {
 
   implicit def dependentMapAt[F[_], G[_], I]: At[DependentMap[F, G], F[I], Option[G[I]]] =
     At[DependentMap[F, G], F[I], Option[G[I]]](
-      i => map => map.get(i))(
-      i => optV => map => optV.fold(map.remove(i))(v => map.put(i, v))
+      (i: F[I]) => (map: DependentMap[F, G]) => map.get(i))(
+      (i: F[I]) => (optV: Option[G[I]]) => (map: DependentMap[F, G]) =>
+      optV.fold(map.remove(i))(v => map.put(i, v))
     )
 
   implicit def dependentMapIndex[F[_], G[_], I]: Index[DependentMap[F, G], F[I], G[I]] = Index.fromAt

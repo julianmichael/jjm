@@ -25,8 +25,8 @@ sealed trait OrWrapped[F[_], A] {
 }
 
 object OrWrapped {
-  def mapK[F[_], G[_]](f: F ~> G): OrWrapped[F, ?] ~> OrWrapped[G, ?] =
-    λ[OrWrapped[F, ?] ~> OrWrapped[G, ?]](_.mapK(f))
+  def mapK[F[_], G[_]](f: F ~> G): OrWrapped[F, *] ~> OrWrapped[G, *] =
+    λ[OrWrapped[F, *] ~> OrWrapped[G, *]](_.mapK(f))
 
   case class Pure[F[_], A](value: A) extends OrWrapped[F, A]
   object Pure {
@@ -46,8 +46,8 @@ object OrWrapped {
   }
 
   // TODO is this actually stack-safe? why did I do this instead of implementing tailRecM?
-  implicit def catsOrWrappedMonad[F[_]: Monad]: Monad[OrWrapped[F, ?]] =
-    new StackSafeMonad[OrWrapped[F, ?]] {
+  implicit def catsOrWrappedMonad[F[_]: Monad]: Monad[OrWrapped[F, *]] =
+    new StackSafeMonad[OrWrapped[F, *]] {
 
       override def pure[A](a: A): OrWrapped[F, A] = OrWrapped.pure[F](a)
 

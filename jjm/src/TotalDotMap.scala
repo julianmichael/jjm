@@ -121,8 +121,8 @@ abstract private[jjm] class TotalDotMapInstances extends TotalDotMapInstances0 {
 
   implicit def totalDotMapAt[F[_], A <: Dot, Out0]: At[TotalDotMap[F, A], A { type Out = Out0 }, F[Out0]] =
     At[TotalDotMap[F, A], A { type Out = Out0 }, F[Out0]](
-      i => map => map(i))(
-      i => v => map => map.update(i)(v)
+      (i: A { type Out = Out0 }) => (map: TotalDotMap[F, A]) => map(i))(
+      (i: A { type Out = Out0 }) => (v: F[Out0]) => (map: TotalDotMap[F, A]) => map.update(i)(v)
     )
 }
 

@@ -36,7 +36,7 @@ class Inflections(private[this] val inflDict: VerbInflectionDictionary) {
       case -1 => (None, verb)
       case i  => (Some(verb.substring(0, i)), verb.substring(i + 1))
     }
-    Option(inflDict.getBestInflections(verbSuffix)).map { l =>
+    Option(inflDict.getBestInflections(verbSuffix)).map(_.toVector).map { l =>
       val forms = verbPrefixOpt.fold(l.map(_.lowerCase))(
         prefix => l.map(suffix => s"$prefix-$suffix".lowerCase)
       )

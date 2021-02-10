@@ -138,8 +138,9 @@ abstract private[jjm] class DotMapInstances extends DotMapInstances0 {
 
   implicit def dotMapAt[F[_], A <: Dot, Out0]: At[DotMap[F, A], A { type Out = Out0 }, Option[F[Out0]]] =
     At[DotMap[F, A], A { type Out = Out0 }, Option[F[Out0]]](
-      i => map => map.get(i))(
-      i => optV => map => optV.fold(map.remove(i))(v => map.put(i)(v))
+      (i: A { type Out = Out0 }) => (map: DotMap[F, A]) => map.get(i))(
+      (i: A { type Out = Out0 }) => (optV: Option[F[Out0]]) => (map: DotMap[F, A]) =>
+      optV.fold(map.remove(i))(v => map.put(i)(v))
     )
 
   implicit def dotMapIndex[F[_], A <: Dot, Out0]: Index[DotMap[F, A], A { type Out = Out0 }, F[Out0]] = Index.fromAt

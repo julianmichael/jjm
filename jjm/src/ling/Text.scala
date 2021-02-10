@@ -16,7 +16,7 @@ import shapeless.record._
 /** Provides method(s) for rendering / manipulating text. */
 object Text {
 
-  def addIndices[F[_]: Traverse, R <: HList : Updater[?, Index]](tokens: F[R]) = {
+  def addIndices[F[_]: Traverse, R <: HList : Updater[*, Index]](tokens: F[R]) = {
     tokens.mapWithIndex((r, i) => r.updated(Index, i))
   }
 

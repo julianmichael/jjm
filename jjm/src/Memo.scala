@@ -45,10 +45,10 @@ object Memo {
   def memoizeDotFuture[A <: Dot](
     f: DotKleisli[DelayedFuture, A],
     startingCache: DotMap[Id, A] = DotMap.empty[Id, A]
-  )(implicit ec: ExecutionContext): DotKleisli[OrWrapped[DelayedFuture, ?], A] = {
+  )(implicit ec: ExecutionContext): DotKleisli[OrWrapped[DelayedFuture, *], A] = {
     var futCache = DotMap.empty[Future, A]
     var cache = startingCache
-    new DotKleisli[OrWrapped[DelayedFuture, ?], A] {
+    new DotKleisli[OrWrapped[DelayedFuture, *], A] {
       override def apply(a: A) = {
         cache.get(a).map(OrWrapped.pure[DelayedFuture](_)).getOrElse {
           futCache.get(a).map[OrWrapped[DelayedFuture, a.Out]](
