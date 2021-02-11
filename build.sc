@@ -24,7 +24,7 @@ val circeVersion = "0.13.0"
 val monocleVersion = "2.0.3"
 val simulacrumVersion = "1.0.0"
 
-// for inflection dictionary; TODO roll my own to be cross-platform and avoid the dep
+// for inflection dictionary on jvm; TODO roll my own to be cross-platform and avoid the dep
 val trove4jVersion = "3.0.1"
 
 // --- io deps ---
@@ -39,6 +39,9 @@ val fastparseVersion = "2.3.1"
 
 // --- corenlp deps ---
 val corenlpVersion = "3.6.0"
+
+// --- ui deps ---
+val scalajsReactVersion = "1.7.7"
 
 // val scalatestVersion = "3.0.5"
 // val scalacheckVersion = "1.13.5"
@@ -198,12 +201,30 @@ class CoreNLPModule(val crossScalaVersion: String) extends CommonPublishModule w
   def artifactName = "jjm-corenlp"
   def millSourcePath = build.millSourcePath / "jjm-corenlp"
   override def sources = T.sources(millSourcePath / "src-jvm")
+  def moduleDeps = List(core.jvm(crossScalaVersion))
   override def ivyDeps = super.ivyDeps() ++ Agg(
     ivy"edu.stanford.nlp:stanford-corenlp:$corenlpVersion",
     ivy"edu.stanford.nlp:stanford-corenlp:$corenlpVersion".configure(
       coursier.core.Attributes(`type` = coursier.core.Type(""), classifier = coursier.core.Classifier("models"))
     ),
   )
-  def moduleDeps = List(core.jvm(crossScalaVersion))
 }
 object corenlp extends Cross[CoreNLPModule](scalaVersions: _*)
+
+class UIModule(val crossScalaVersion: String) extends CommonPublishModule with JsPlatform {
+  def artifactName = "jjm-ui"
+  def millSourcePath = build.millSourcePath / "jjm-ui"
+  override def sources = T.sources(millSourcePath / "src-js")
+  def moduleDeps = Seq(core.js())
+
+  def ivyDeps = Agg(
+    ivy"com.github.japgolly.scalajs-react::core::$scalajsReactVersion",
+    ivy"com.github.japgolly.scalajs-react::extra::$scalajsReactVersion",
+    ivy"com.github.japgolly.scalajs-react::ext-monocle-cats::$scalajsReactVersion",
+    ivy"com.github.japgolly.scalajs-react::ext-cats::$scalajsReactVersion",
+    // ivy"com.github.japgolly.scalacss::core::$scalajsScalaCSSVersion",
+    // ivy"com.github.japgolly.scalacss::ext-react::$scalajsScalaCSSVersion"
+  )
+}
+
+object ui extends Cross[UIModule](scalaVersions: _*)
