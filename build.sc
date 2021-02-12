@@ -42,6 +42,7 @@ val corenlpVersion = "3.6.0"
 
 // --- ui deps ---
 val scalajsReactVersion = "1.7.7"
+val scalacssVersion = "0.7.0"
 
 // val scalatestVersion = "3.0.5"
 // val scalacheckVersion = "1.13.5"
@@ -222,8 +223,8 @@ class UIModule(val crossScalaVersion: String) extends CommonPublishModule with J
     ivy"com.github.japgolly.scalajs-react::extra::$scalajsReactVersion",
     ivy"com.github.japgolly.scalajs-react::ext-monocle-cats::$scalajsReactVersion",
     ivy"com.github.japgolly.scalajs-react::ext-cats::$scalajsReactVersion",
-    // ivy"com.github.japgolly.scalacss::core::$scalajsScalaCSSVersion",
-    // ivy"com.github.japgolly.scalacss::ext-react::$scalajsScalaCSSVersion"
+    ivy"com.github.japgolly.scalacss::core::$scalacssVersion",
+    ivy"com.github.japgolly.scalacss::ext-react::$scalacssVersion"
   )
 }
 

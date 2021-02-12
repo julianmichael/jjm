@@ -17,6 +17,7 @@ sealed trait Span {
   def begin: Int
   def endInclusive: Int
   def endExclusive: Int
+  def translate(offset: Int): Span
   def length: Int = endExclusive - begin
   def contains(i: Int) = begin <= i && i < endExclusive
   def overlaps(that: Span): Boolean = {
@@ -54,6 +55,7 @@ sealed trait ISpan extends Span {
   def end: Int
   final def endInclusive = end
   final def endExclusive = end + 1
+  final def translate(offset: Int): ISpan = ISpan(begin + offset, end + offset)
   final override def toInclusive: ISpan = this
 }
 
@@ -96,6 +98,7 @@ sealed trait ESpan extends Span {
   def end: Int
   final def endInclusive = end - 1
   final def endExclusive = end
+  final def translate(offset: Int): ISpan = ISpan(begin + offset, end + offset)
   final override def toExclusive: ESpan = this
 }
 
