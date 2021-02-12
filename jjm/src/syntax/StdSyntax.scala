@@ -1,6 +1,20 @@
 package jjm.syntax
 
+import jjm.Duad
+
+import cats.Functor
+import cats.Order
+import cats.data.Ior
+import cats.implicits._
+
 trait StdSyntax {
+
+  implicit class RichPair[F[_], A, B](val x: F[(A, B)]) { // TODO AnyVal
+    def mapFirst[C](f: A => C)(implicit F: Functor[F]): F[(C, B)] =
+      x.map { case (a, b) => f(a) -> b }
+    def mapSecond[C](f: B => C)(implicit F: Functor[F]): F[(A, C)] =
+      x.map { case (a, b) => a -> f(b) }
+  }
 
   implicit class RichList[A](val a: List[A]) { // TODO AnyVal
     def remove(i: Int) = a.take(i) ++ a.drop(i + 1)
@@ -17,6 +31,26 @@ trait StdSyntax {
     }
   }
 
+  implicit class RichMap[A, B](val x: Map[A, B]) { // TODO AnyVal
+    def mapVals[C](f: B => C): Map[A, C] = x.transform { case (_, v) => f(v) }
+    def zipValues[C](y: Map[A, C]) = {
+      val keys = x.keySet.intersect(y.keySet)
+      keys.iterator.map(k => k -> (x(k) -> y(k))).toMap
+    }
+    def normalize(implicit N: Numeric[B]): Map[A, Double] = {
+      val total = N.toDouble(x.values.sum)
+      mapVals(v => N.toDouble(v) / total)
+    }
+
+    // superseded by `Align` once that's in cats
+    def merge[C](y: Map[A, C]): Map[A, Ior[B, C]] = {
+      val keySet = x.keySet ++ y.keySet
+      keySet.iterator.map { key =>
+        key -> Ior.fromOptions(x.get(key), y.get(key)).get // should always work
+      }.toMap
+    }
+  }
+
   final implicit class RichAny[A](val a: A) { // TODO AnyVal
     def <|[B](f: A => B): B = f(a)
 
@@ -24,6 +58,8 @@ trait StdSyntax {
 
     def onlyIf(p: (A => Boolean)): Option[A] = Some(a).filter(p)
     def ifNot(p: (A => Boolean)): Option[A] = Some(a).filterNot(p)
+
+    def <->(b: A)(implicit o: Order[A]): Duad[A] = Duad(a, b)
   }
 
   // implicit class RichTry[A](val t: Try[A]) extends AnyVal {

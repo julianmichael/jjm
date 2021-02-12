@@ -108,8 +108,22 @@ object ESpan {
 
   // no Lenses because they would not actually be lawful due to the ordering constraint on begin/end
 
+  implicit val espanShow: Show[ESpan] = Show.show[ESpan](_.toString)
+
+  implicit val espanOrder: Order[ESpan] = Order.whenEqual(
+    Order.by[ESpan, Int](_.begin),
+    Order.by[ESpan, Int](_.end)
+  )
+
+  implicit val espanOrdering: Ordering[ESpan] = espanOrder.toOrdering
+
+  implicit val espanSemigroup: Semigroup[ESpan] = new Semigroup[ESpan] {
+    def combine(x: ESpan, y: ESpan) = ESpan(math.min(x.begin, y.begin), math.max(x.end, y.end))
+  }
+
   import io.circe.Encoder
   import io.circe.Decoder
+  import io.circe.{KeyEncoder, KeyDecoder}
   import io.circe.syntax._
 
   implicit val espanEncoder: Encoder[ESpan] = Encoder.instance[ESpan] { span =>
@@ -123,16 +137,13 @@ object ESpan {
     } yield ESpan(begin, end)
   }
 
-  implicit val espanShow: Show[ESpan] = Show.show[ESpan](_.toString)
-
-  implicit val espanOrder: Order[ESpan] = Order.whenEqual(
-    Order.by[ESpan, Int](_.begin),
-    Order.by[ESpan, Int](_.end)
-  )
-
-  implicit val espanOrdering: Ordering[ESpan] = espanOrder.toOrdering
-
-  implicit val espanSemigroup: Semigroup[ESpan] = new Semigroup[ESpan] {
-    def combine(x: ESpan, y: ESpan) = ESpan(math.min(x.begin, y.begin), math.max(x.end, y.end))
+  val ESpanString = "\\[(-?[0-9]+), (-?[0-9]+)\\)".r
+  implicit val eSpanKeyEncoder: KeyEncoder[ESpan] = KeyEncoder.encodeKeyString.contramap[ESpan](_.toString)
+  implicit val eSpanKeyDecoder: KeyDecoder[ESpan] = KeyDecoder.instance[ESpan] {
+    case ESpanString(beginStr, endStr) => for {
+      begin <- scala.util.Try(beginStr.toInt).toOption
+      end <- scala.util.Try(endStr.toInt).toOption
+    } yield ESpan(begin, end)
+    case _ => None
   }
 }

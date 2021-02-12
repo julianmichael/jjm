@@ -9,6 +9,7 @@ import cats.Applicative
 import cats.Foldable
 import cats.Order
 import cats.Monad
+import cats.Monoid
 import cats.data.Ior
 import cats.data.NonEmptyList
 import cats.arrow.Arrow
@@ -63,9 +64,9 @@ trait CatsSyntax {
   }
 
   implicit class RichIorSame[A](val ior: Ior[A, A]) { // TODO AnyVal
-    def mergeM[M[_]: Monad](f: (A, A) => M[A]) = ior.fold(
-      Monad[M].pure,
-      Monad[M].pure,
+    def mergeM[F[_]: Applicative](f: (A, A) => F[A]) = ior.fold(
+      Applicative[F].pure,
+      Applicative[F].pure,
       f
     )
   }
@@ -80,13 +81,8 @@ trait CatsSyntax {
   //     maximaNelBy(f)(o.reverse)
   // }
 
-  implicit class CatsRichMap[A, B](val x: Map[A, B]) { // TODO AnyVal
-    // superseded by `Align` once that's in cats
-    def merge[C](y: Map[A, C]): Map[A, Ior[B, C]] = {
-      val keySet = x.keySet ++ y.keySet
-      keySet.iterator.map { key =>
-        key -> Ior.fromOptions(x.get(key), y.get(key)).get // should always work
-      }.toMap
-    }
+  implicit class RichNested[M[_], F[_], A](val x: M[F[A]]) { // TODO AnyVal
+    def flatFoldMapM[B: Monoid](f: A => M[B])(implicit M: Monad[M], F: Foldable[F]): M[B] =
+      M.flatMap(x)(_.foldMapM(f))
   }
 }
