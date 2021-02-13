@@ -3,13 +3,12 @@ import mill.scalalib.scalafmt._
 import coursier.maven.MavenRepository
 import ammonite.ops._
 
-val thisPublishVersion = "0.2.0-SNAPSHOT"
+val thisPublishVersion = "0.2.0"
 val scalaVersions = List(
   "2.12.13",
   "2.13.4"
 )
 val thisScalaJSVersion = "1.4.0"
-// val thisScalaJSVersion = "0.6.33"
 
 val macroParadiseVersion = "2.1.1"
 val kindProjectorVersion = "0.11.3"
