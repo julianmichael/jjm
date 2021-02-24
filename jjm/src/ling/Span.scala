@@ -98,7 +98,7 @@ sealed trait ESpan extends Span {
   def end: Int
   final def endInclusive = end - 1
   final def endExclusive = end
-  final def translate(offset: Int): ISpan = ISpan(begin + offset, end + offset)
+  final def translate(offset: Int): ESpan = ESpan(begin + offset, end + offset)
   final override def toExclusive: ESpan = this
 }
 

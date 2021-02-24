@@ -75,8 +75,33 @@ class View(styles: View.Styles) {
     def apply(
       toggle: StateSnapshot[Boolean],
       labelOpt: Option[String],
-      didUpdate: Boolean => Callback = _ => Callback.empty
-    ) = mod()(toggle, labelOpt, didUpdate)
+      didUpdate: Boolean => Callback
+    ): TagOf[html.Span] = mod()(toggle, labelOpt, didUpdate)
+
+    def apply(
+      toggle: StateSnapshot[Boolean],
+      labelOpt: Option[String],
+    ): TagOf[html.Span] = mod()(toggle, labelOpt, _ => Callback.empty)
+
+    def apply(
+      toggle: StateSnapshot[Boolean],
+      didUpdate: Boolean => Callback
+    ): TagOf[html.Span] = mod()(toggle, None, didUpdate)
+
+    def apply(
+      toggle: StateSnapshot[Boolean]
+    ): TagOf[html.Span] = mod()(toggle, None, _ => Callback.empty)
+
+    def apply(
+      toggle: StateSnapshot[Boolean],
+      label: String,
+      didUpdate: Boolean => Callback
+    ): TagOf[html.Span] = mod()(toggle, Some(label), didUpdate)
+
+    def apply(
+      toggle: StateSnapshot[Boolean],
+      label: String
+    ): TagOf[html.Span] = mod()(toggle, Some(label), _ => Callback.empty)
   }
 
   // TODO add styling and functionality from livetextfield
@@ -375,7 +400,7 @@ class View(styles: View.Styles) {
     ): (Vector[String], NonEmptyList[A]) = {
       val min = spanItems.map(s => spanLens.get(s).begin).minimum
       val max = spanItems.map(s => spanLens.get(s).endExclusive).maximum
-      passage.slice(min, max) -> spanItems.map(spanLens.modify(_.translate(min)))
+      passage.slice(min, max) -> spanItems.map(spanLens.modify(_.translate(-min)))
     }
 
     def renderHighlights(
