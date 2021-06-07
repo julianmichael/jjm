@@ -49,7 +49,7 @@ object View {
   }
 }
 
-class View(styles: View.Styles) {
+class View(val styles: View.Styles) {
   @inline private[this] final def S = styles
   private val BoolLocal = new LocalState[Boolean]
   private val StringLocal = new LocalState[String]
