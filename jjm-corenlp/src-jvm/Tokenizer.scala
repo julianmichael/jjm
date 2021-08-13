@@ -28,7 +28,7 @@ object Tokenizer {
         Token.field(coreLabel.word)
           :: SourceText.field(
             TokenText(
-              originalText = coreLabel.originalText,
+              token = coreLabel.originalText,
               whitespaceBefore = coreLabel.before,
               whitespaceAfter = coreLabel.after
             ))

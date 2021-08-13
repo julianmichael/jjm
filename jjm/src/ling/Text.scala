@@ -247,7 +247,7 @@ object Text {
       input,
       (a: A) => a.sourceText,
       spaceFromSurroundingWords,
-      (a: A) => renderOriginalToken(a.sourceText.originalText)
+      (a: A) => renderOriginalToken(a.sourceText.token)
     )
 
   /** Non-monadic convenience method for renderM with aligned tokens */
@@ -274,7 +274,7 @@ object Text {
       input,
       (a: A) => a.sourceText,
       spaceFromSurroundingWords,
-      (a: A) => renderOriginalToken(a.sourceText.originalText)
+      (a: A) => renderOriginalToken(a.sourceText.token)
     )
   }
 
@@ -290,8 +290,8 @@ object Text {
       case Nil =>
         ""
       case first :: rest =>
-        first.originalText + rest
-          .map(t => t.whitespaceBefore + t.originalText)
+        first.token + rest
+          .map(t => t.whitespaceBefore + t.token)
           .mkString
     }
   }
@@ -300,6 +300,9 @@ object Text {
   sealed trait TextRendererLowPriority0 {
     implicit def stringRenderer[F[_]: Foldable] = new TextRenderer[String, F] {
       def apply(input: F[String]) = renderTokens(input.toList.map(Token(_)))
+    }
+    implicit def tokenTextRenderer[F[_]: Foldable] = new TextRenderer[TokenText, F] {
+      def apply(input: F[TokenText]) = renderSource(input.toList.map(SourceText(_)))
     }
   }
   sealed trait TextRendererLowPriority extends TextRendererLowPriority0 {
@@ -317,6 +320,9 @@ object Text {
   sealed trait SpanRendererLowPriority0 {
     implicit def stringRenderer[F[_]: Foldable] = new SpanRenderer[String, F] {
       def apply(input: F[String], span: Span) = renderSpanTokens(addIndices(input.toList.map(Token(_))), span)
+    }
+    implicit def tokenTextRenderer[F[_]: Foldable] = new SpanRenderer[TokenText, F] {
+      def apply(input: F[TokenText], span: Span) = renderSpanSource(addIndices(input.toList.map(SourceText(_))), span)
     }
     implicit def indexingTokenRenderer[A: HasToken, F[_]: Foldable] = new SpanRenderer[A, F] {
       def apply(input: F[A], span: Span) = renderSpanTokens(addIndices(input.toList.map(t => Token(t.token))), span)

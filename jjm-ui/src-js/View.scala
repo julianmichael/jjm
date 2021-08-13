@@ -32,7 +32,9 @@ object View {
       addClassNames("form-check-label")
     )
 
-    val textField = style()
+    val textFieldSpan = style()
+    val textFieldLabel = style()
+    val textFieldInput = style()
 
     val invalidTextBackground = style(
       backgroundColor(rgba(255, 0, 0, 0.3))
@@ -112,7 +114,7 @@ class View(val styles: View.Styles) {
     ) = <.span(
       label.whenDefined, // TODO more styling
       StringLocal.make(initialValue = value.value.toString) { inputText =>
-        <.input(S.textField)(
+        <.input(S.textFieldInput)(
           ^.`type` := "text",
           ^.value := inputText.value,
           ^.onChange ==> ((e: ReactEventFromInput) => inputText.setState(e.target.value)),
@@ -137,10 +139,10 @@ class View(val styles: View.Styles) {
   case class LiveTextField[A](makeValue: String => Option[A]) {
 
     def mod(
-      span: TagMod = TagMod.empty,
-      input: TagMod = S.textField,
-      inputFromValue: Option[A] => TagMod = LiveTextField.defaultInputStyleFromValue[A](_),
-      label: TagMod = TagMod.empty)(
+      span: TagMod = S.textFieldSpan,
+      label: TagMod = S.textFieldLabel,
+      input: TagMod = S.textFieldInput,
+      inputFromValue: Option[A] => TagMod = LiveTextField.defaultInputStyleFromValue[A](_))(
       value: StateSnapshot[A],
       labelOpt: Option[String] = None,
       didUpdateValue: A => Callback = _ => Callback.empty
@@ -170,6 +172,7 @@ class View(val styles: View.Styles) {
   }
   object LiveTextField {
     def Double = LiveTextField((s: String) => scala.util.Try(s.toDouble).toOption)
+    def String = TextField[String](Option(_))
 
     def defaultInputStyleFromValue[A](valueOpt: Option[A]): TagMod =
       S.invalidTextBackground.when(valueOpt.isEmpty)
@@ -338,6 +341,7 @@ class View(val styles: View.Styles) {
   import jjm.ling.ESpan
   import jjm.ling.Span
   import jjm.ling.Text
+  import jjm.ling.TokenText
 
   import cats.data.NonEmptyList
   import cats.implicits._
@@ -345,7 +349,8 @@ class View(val styles: View.Styles) {
   import scalajs.js
 
   object Spans {
-    def renderHighlightedPassage(
+
+    def renderHighlightedTokens(
       tokens: Vector[String],
       highlights: List[(Span, Rgba)],
       wordRenderers : Map[Int, VdomTag => VdomTag] = Map()
@@ -390,20 +395,67 @@ class View(val styles: View.Styles) {
       ).toVdomArray(x => x)
     }
 
+    def renderHighlightedTokenText(
+      tokens: Vector[TokenText],
+      highlights: List[(Span, Rgba)],
+      wordRenderers : Map[Int, VdomTag => VdomTag] = Map()
+    ) = {
+      val wordIndexToLayeredColors = (0 until tokens.size).map { i =>
+        i -> highlights.collect {
+          case (span, color) if span.contains(i) => color
+        }
+      }.toMap
+      val indexAfterToSpaceLayeredColors = (0 to tokens.size).map { i =>
+        i -> highlights.collect {
+          case (span, color) if span.contains(i - 1) && span.contains(i) => color
+        }
+      }.toMap
+      Text.renderSource[Int, List, List[VdomElement]](
+        words = tokens.indices.toList,
+        getSourceText = (index: Int) => tokens(index),
+        spaceFromSurroundingWords = (prevIndex: Option[Int], space: String, nextIndex: Option[Int]) => {
+          if(space.isEmpty) Nil else {
+            val colors = nextIndex.foldMap(indexAfterToSpaceLayeredColors)
+            val colorStr = NonEmptyList[Rgba](Rgba.transparent, colors)
+              .reduce((x: Rgba, y: Rgba) => x add y).toColorStyleString
+            List(
+              <.span(
+                ^.key := s"space-$nextIndex",
+                ^.style := js.Dynamic.literal("backgroundColor" -> colorStr),
+                space
+              )
+            )
+          }
+        },
+        renderWord = (index: Int) => {
+          val colorStr = NonEmptyList(Rgba.transparent, wordIndexToLayeredColors(index))
+            .reduce((x: Rgba, y: Rgba) => x add y).toColorStyleString
+          val render: (VdomTag => VdomTag) = wordRenderers.get(index).getOrElse((x: VdomTag) => x)
+          val element: VdomTag = render(
+            <.span(
+              ^.style := js.Dynamic.literal("backgroundColor" -> colorStr),
+              tokens(index).token
+            )
+          )
+          List(element(^.key := s"word-$index"))
+        }
+      ).toVdomArray(x => x)
+    }
+
     import monocle.Lens
     import monocle.function.{all => Optics}
 
-    def cropPassageAndSpans[A](
-      passage: Vector[String],
+    def cropPassageAndSpans[T, A](
+      passage: Vector[T],
       spanItems: NonEmptyList[A],
       spanLens: Lens[A, Span]
-    ): (Vector[String], NonEmptyList[A]) = {
+    ): (Vector[T], NonEmptyList[A]) = {
       val min = spanItems.map(s => spanLens.get(s).begin).minimum
       val max = spanItems.map(s => spanLens.get(s).endExclusive).maximum
       passage.slice(min, max) -> spanItems.map(spanLens.modify(_.translate(-min)))
     }
 
-    def renderHighlights(
+    def renderTokenHighlights(
       tokens: Vector[String],
       highlights: NonEmptyList[(ESpan, Rgba)]
     ): VdomArray = {
@@ -428,7 +480,41 @@ class View(val styles: View.Styles) {
         )
         List(
           <.span(
-            renderHighlightedPassage(groupTokens, groupSpans.toList)
+            renderHighlightedTokens(groupTokens, groupSpans.toList)
+          )
+        )
+      }.intercalate(List(<.span(" / ")))
+      answerHighlighties.zipWithIndex.toVdomArray { case (a, i) =>
+        a(^.key := s"answerString-$i")
+      }
+    }
+
+    def renderTokenTextHighlights(
+      tokens: Vector[TokenText],
+      highlights: NonEmptyList[(ESpan, Rgba)]
+    ): VdomArray = {
+      val orderedHighlights = highlights.sortBy(_._1)
+      case class GroupingState(
+        completeGroups: List[NonEmptyList[(ESpan, Rgba)]],
+        currentGroup: NonEmptyList[(ESpan, Rgba)]
+      )
+      val groupingState = orderedHighlights.tail
+        .foldLeft(GroupingState(Nil, NonEmptyList.of(orderedHighlights.head))) {
+        case (GroupingState(groups, curGroup), (span, color)) =>
+          if(curGroup.exists(_._1.overlaps(span))) {
+            GroupingState(groups, (span -> color) :: curGroup)
+          } else {
+            GroupingState(curGroup :: groups, NonEmptyList.of(span -> color))
+          }
+      }
+      val contigSpanLists = NonEmptyList(groupingState.currentGroup, groupingState.completeGroups)
+      val answerHighlighties = contigSpanLists.reverse.map { spanList =>
+        val (groupTokens, groupSpans) = cropPassageAndSpans(
+          tokens, spanList, Optics.first[(Span, Rgba), Span]
+        )
+        List(
+          <.span(
+            renderHighlightedTokenText(groupTokens, groupSpans.toList)
           )
         )
       }.intercalate(List(<.span(" / ")))
