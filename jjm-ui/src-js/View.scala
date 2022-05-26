@@ -107,13 +107,13 @@ class View(val styles: View.Styles) {
   }
 
   // TODO add styling and functionality from livetextfield
-  case class TextField[A](makeValue: String => Option[A]) {
+  case class TextField[A](readValue: String => Option[A], renderValue: A => String) {
     def apply(
       value: StateSnapshot[A],
       label: Option[String] = None,
     ) = <.span(
       label.whenDefined, // TODO more styling
-      StringLocal.make(initialValue = value.value.toString) { inputText =>
+      StringLocal.make(initialValue = renderValue(value.value)) { inputText =>
         <.input(S.textFieldInput)(
           ^.`type` := "text",
           ^.value := inputText.value,
@@ -121,22 +121,22 @@ class View(val styles: View.Styles) {
           ^.onKeyDown ==> ((e: ReactKeyboardEventFromInput) =>
             CallbackOption.keyCodeSwitch(e) {
               case KeyCode.Enter =>
-                makeValue(inputText.value).fold(Callback.empty)(value.setState)
+                readValue(inputText.value).fold(Callback.empty)(value.setState)
             }
           )
         )
       }
     )
-    def mapOpt[B](f: A => Option[B]) = TextField(
-      makeValue.map(_.flatMap(f))
+    def dimapOpt[B](f: A => Option[B], g: B => A) = TextField[B](
+      readValue.map(_.flatMap(f)), b => renderValue(g(b))
     )
   }
   object TextField {
-    def String = TextField[String](Option(_))
-    def Double = TextField((s: String) => scala.util.Try(s.toDouble).toOption)
+    def String = TextField[String](Option(_), _.toString)
+    def Double = TextField[Double]((s: String) => scala.util.Try(s.toDouble).toOption, _.toString)
   }
 
-  case class LiveTextField[A](makeValue: String => Option[A]) {
+  case class LiveTextField[A](readValue: String => Option[A], renderValue: A => String) {
 
     def mod(
       span: TagMod = S.textFieldSpan,
@@ -148,14 +148,14 @@ class View(val styles: View.Styles) {
       didUpdateValue: A => Callback = _ => Callback.empty
     ) = <.span(span)(
       labelOpt.whenDefined(l => <.span(label)(s" $l")),
-      StringLocal.make(initialValue = value.value.toString) { inputText =>
+      StringLocal.make(initialValue = renderValue(value.value)) { inputText =>
         BoolLocal.make(initialValue = false) { isInvalid =>
           <.input(input, inputFromValue(Option(value.value).filter(_ => !isInvalid.value)))(
             ^.`type` := "text",
             ^.value := inputText.value,
             ^.onChange ==> ((e: ReactEventFromInput) =>
               inputText.setState(e.target.value) >>
-                makeValue(e.target.value).fold(isInvalid.setState(true))(v =>
+                readValue(e.target.value).fold(isInvalid.setState(true))(v =>
                   isInvalid.setState(false) >> value.setState(v) >> didUpdateValue(v)
                 )
             )
@@ -171,8 +171,8 @@ class View(val styles: View.Styles) {
     ) = mod()(value, labelOpt, didUpdateValue)
   }
   object LiveTextField {
-    def Double = LiveTextField((s: String) => scala.util.Try(s.toDouble).toOption)
-    def String = TextField[String](Option(_))
+    def Double = LiveTextField[Double]((s: String) => scala.util.Try(s.toDouble).toOption, _.toString)
+    def String = LiveTextField[String](Option(_), _.toString)
 
     def defaultInputStyleFromValue[A](valueOpt: Option[A]): TagMod =
       S.invalidTextBackground.when(valueOpt.isEmpty)
