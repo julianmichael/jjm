@@ -20,6 +20,10 @@ trait StdSyntax {
     def remove(i: Int) = a.take(i) ++ a.drop(i + 1)
   }
 
+  implicit class RichVector[A](val a: Vector[A]) { // TODO AnyVal
+    def remove(i: Int) = a.take(i) ++ a.drop(i + 1)
+  }
+
   implicit class RichOption[A](val a: Option[A]) { // TODO AnyVal
     // more readable alternatives to forall/exists
     def emptyOr(predicate: A => Boolean): Boolean = a.forall(predicate)

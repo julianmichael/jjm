@@ -145,6 +145,7 @@ class View(val styles: View.Styles) {
       inputFromValue: Option[A] => TagMod = LiveTextField.defaultInputStyleFromValue[A](_))(
       value: StateSnapshot[A],
       labelOpt: Option[String] = None,
+      placeholderOpt: Option[String] = None,
       didUpdateValue: A => Callback = _ => Callback.empty
     ) = <.span(span)(
       labelOpt.whenDefined(l => <.span(label)(s" $l")),
@@ -152,6 +153,7 @@ class View(val styles: View.Styles) {
         BoolLocal.make(initialValue = false) { isInvalid =>
           <.input(input, inputFromValue(Option(value.value).filter(_ => !isInvalid.value)))(
             ^.`type` := "text",
+            placeholderOpt.whenDefined(ph => ^.placeholder := ph),
             ^.value := inputText.value,
             ^.onChange ==> ((e: ReactEventFromInput) =>
               inputText.setState(e.target.value) >>
@@ -167,12 +169,57 @@ class View(val styles: View.Styles) {
     def apply(
       value: StateSnapshot[A],
       labelOpt: Option[String] = None,
+      placeholderOpt: Option[String] = None,
       didUpdateValue: A => Callback = _ => Callback.empty
-    ) = mod()(value, labelOpt, didUpdateValue)
+    ) = mod()(value, labelOpt, placeholderOpt, didUpdateValue)
   }
   object LiveTextField {
     def Double = LiveTextField[Double]((s: String) => scala.util.Try(s.toDouble).toOption, _.toString)
     def String = LiveTextField[String](Option(_), _.toString)
+
+    def defaultInputStyleFromValue[A](valueOpt: Option[A]): TagMod =
+      S.invalidTextBackground.when(valueOpt.isEmpty)
+  }
+
+  case class LiveTextArea[A](readValue: String => Option[A], renderValue: A => String) {
+
+    def mod(
+      span: TagMod = S.textFieldSpan,
+      label: TagMod = S.textFieldLabel,
+      textarea: TagMod = S.textFieldInput,
+      textareaFromValue: Option[A] => TagMod = LiveTextArea.defaultInputStyleFromValue[A](_))(
+      value: StateSnapshot[A],
+      labelOpt: Option[String] = None,
+      placeholderOpt: Option[String] = None,
+      didUpdateValue: A => Callback = _ => Callback.empty
+    ) = <.span(span)(
+      labelOpt.whenDefined(l => <.span(label)(s" $l")),
+      StringLocal.make(initialValue = renderValue(value.value)) { inputText =>
+        BoolLocal.make(initialValue = false) { isInvalid =>
+          <.textarea(textarea, textareaFromValue(Option(value.value).filter(_ => !isInvalid.value)))(
+            placeholderOpt.whenDefined(ph => ^.placeholder := ph),
+            ^.value := inputText.value,
+            ^.onChange ==> ((e: ReactEventFromInput) =>
+              inputText.setState(e.target.value) >>
+                readValue(e.target.value).fold(isInvalid.setState(true))(v =>
+                  isInvalid.setState(false) >> value.setState(v) >> didUpdateValue(v)
+                )
+            )
+          )
+        }
+      }
+    )
+
+    def apply(
+      value: StateSnapshot[A],
+      labelOpt: Option[String] = None,
+      placeholderOpt: Option[String] = None,
+      didUpdateValue: A => Callback = _ => Callback.empty
+    ) = mod()(value, labelOpt, placeholderOpt, didUpdateValue)
+  }
+  object LiveTextArea {
+    def Double = LiveTextArea[Double]((s: String) => scala.util.Try(s.toDouble).toOption, _.toString)
+    def String = LiveTextArea[String](Option(_), _.toString)
 
     def defaultInputStyleFromValue[A](valueOpt: Option[A]): TagMod =
       S.invalidTextBackground.when(valueOpt.isEmpty)
