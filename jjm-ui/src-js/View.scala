@@ -352,7 +352,7 @@ class View(val styles: View.Styles) {
   case class Select[A](show: A => String) {
     def modFull(select: TagMod = TagMod.empty)(
       choices: List[A],
-      curChoice: A, setChoice: A => Callback
+      curChoice: A, setChoice: A => Callback,
     ): TagOf[html.Select] = <.select(select)(
       ^.value := show(curChoice),
       ^.onChange ==> (
@@ -369,7 +369,7 @@ class View(val styles: View.Styles) {
 
     def mod(select: TagMod = TagMod.empty)(
       choices: List[A],
-      choice: StateSnapshot[A]
+      choice: StateSnapshot[A],
     ): TagOf[html.Select] = modFull(select)(choices, choice.value, choice.setState)
 
     def apply(
@@ -383,6 +383,9 @@ class View(val styles: View.Styles) {
     ): TagOf[html.Select] = mod()(choices, choice)
 
     def contramap[B](f: B => A): Select[B] = Select(f andThen show)
+  }
+  object Select {
+    val String = Select[String](identity)
   }
 
   import jjm.ling.ESpan

@@ -11,8 +11,9 @@ case class Counts(hist: Map[Int, Int]) {
       hist.toList.sortBy(_._1).map { case (num, count) =>
         val numPounds = math.round(count.toDouble * totalBarLength / max).toInt
         val poundString = "#" * numPounds
+        val spacer = " " * (totalBarLength - numPounds)
         val percent = count * 100.0 / total
-        f"$num%7d | $poundString%s $count%d ($percent%.2f%%)"
+        f"$num%7d | $poundString%s$spacer%s $count%7d ($percent%.2f%%)"
       }.mkString("\n")
     }
   }
