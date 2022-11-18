@@ -1,7 +1,7 @@
 import mill._, mill.scalalib._, mill.scalalib.publish._, mill.scalajslib._
 import mill.scalalib.scalafmt._
 import coursier.maven.MavenRepository
-import ammonite.ops._
+import os._
 
 val thisPublishVersion = "0.2.2-SNAPSHOT"
 val scalaVersions = List(

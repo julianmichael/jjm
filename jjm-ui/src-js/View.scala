@@ -149,7 +149,10 @@ class View(val styles: View.Styles) {
       didUpdateValue: A => Callback = _ => Callback.empty
     ) = <.span(span)(
       labelOpt.whenDefined(l => <.span(label)(s" $l")),
-      StringLocal.make(initialValue = renderValue(value.value)) { inputText =>
+      StringLocal.make(
+        initialValue = renderValue(value.value),
+        shouldRefresh = (s => readValue(s).forall(_ != value.value))
+      ) { inputText =>
         BoolLocal.make(initialValue = false) { isInvalid =>
           <.input(input, inputFromValue(Option(value.value).filter(_ => !isInvalid.value)))(
             ^.`type` := "text",
