@@ -3,7 +3,7 @@ import mill.scalalib.scalafmt._
 import coursier.maven.MavenRepository
 import os._
 
-val thisPublishVersion = "0.2.2-SNAPSHOT"
+val thisPublishVersion = "0.2.2"
 val scalaVersions = List(
   "2.12.13",
   "2.13.4"
