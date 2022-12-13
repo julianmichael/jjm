@@ -1,75 +1,167 @@
 package jjm.ui
 
+import scalajs.js.typedarray.ArrayBuffer
+
 import org.scalajs.dom.WebSocket
+import org.scalajs.dom.raw.Blob
 import org.scalajs.dom.raw.CloseEvent
 import org.scalajs.dom.raw.MessageEvent
 import org.scalajs.dom.raw.Event
+import org.scalajs.dom.raw.FileReader
 
 import japgolly.scalajs.react.vdom.html_<^._
 import japgolly.scalajs.react._
 
-class WebSocketConnection[Request, Response](
-  requestToString: Request => String,
-  responseFromString: String => Response) {
+import scala.concurrent.Promise
+import scala.concurrent.ExecutionContext
 
-  sealed trait State {
-    def toContext = this match {
-      case ConnectingState => Connecting
-      case ConnectedState(socket) => Connected((r: Request) => Callback(socket.send(requestToString(r))))
-    }
-  }
-  case object ConnectingState extends State
+import cats.Id
+import io.circe.Encoder
+import io.circe.Decoder
+
+/** HOC for websocket connections.
+  *
+  * @param sendRequest
+  * @param readResponse
+  */
+class WebSocketConnection[F[_], Request, Response](
+    sendRequest: (WebSocket, Request) => Callback,
+    readResponse: MessageEvent => F[Response]
+) {
+
+  sealed trait State
   case class ConnectedState(socket: WebSocket) extends State
 
-  case class Props(
-    websocketURI: String,
-    onMessage: (((Request => Callback), Response) => Callback) = ((_, _) => Callback.empty),
-    render: Context => VdomElement
-  )
-
   sealed trait Context
-  case object Connecting extends Context
-  case class Connected(send: Request => Callback) extends Context
+  case class Connected(
+      send: Request => Callback,
+  ) extends Context
+
+  case class Disconnected(reconnect: Callback, reason: String)
+      extends State
+      with Context
+  case object Connecting extends State with Context
+
+  case class Props(
+      websocketURI: String,
+      onOpen: (Request => Callback) => Callback,
+      onMessage: (((Request => Callback), F[Response]) => Callback),
+      render: Context => VdomElement
+  )
 
   class Backend(scope: BackendScope[Props, State]) {
 
-    def connect(props: Props): Callback = scope.state map {
-      case ConnectingState =>
-        val socket = new WebSocket(props.websocketURI)
-        val send = (r: Request) => Callback(socket.send(requestToString(r)))
-        socket.onopen = { (event: Event) =>
-          scope.setState(ConnectedState(socket)).runNow()
-        }
-        socket.onerror = { (event: Event) =>
-          val msg = s"Connection failure. Error: $event"
-          System.err.println(msg)
-        }
-        socket.onmessage = { (event: MessageEvent) =>
-          props.onMessage(send, responseFromString(event.data.toString)).runNow()
-        }
-        socket.onclose = { (event: CloseEvent) =>
-          val cleanly = if (event.wasClean) "cleanly" else "uncleanly"
-          val msg = s"WebSocket connection closed $cleanly with code ${event.code}. reason: ${event.reason}"
-          System.err.println(msg)
-        }
+    def connect(props: Props): Callback = scope.state >>= {
       case ConnectedState(_) =>
-        System.err.println("Already connected.")
+        Callback(System.err.println("Already connected."))
+      case Disconnected(_, _) | Connecting =>
+        scope.setState(Connecting) >> Callback {
+          val socket = new WebSocket(props.websocketURI)
+          val send = (r: Request) => sendRequest(socket, r)
+          socket.onopen = { (_: Event) =>
+            (scope.setState(ConnectedState(socket)) >> props.onOpen(send))
+              .runNow()
+          }
+          socket.onerror = { (event: Event) =>
+            val msg = s"WebSocket connection failure. Error: ${event}"
+            System.err.println(msg)
+            scope.setState(Disconnected(connect(props), msg)).runNow()
+          }
+          socket.onmessage = { (event: MessageEvent) =>
+            props.onMessage(send, readResponse(event)).runNow()
+          }
+          socket.onclose = { (event: CloseEvent) =>
+            val cleanly = if (event.wasClean) "cleanly" else "uncleanly"
+            val msg =
+              s"WebSocket connection closed $cleanly with code ${event.code}. reason: ${event.reason}"
+            if (!event.wasClean) {
+              System.err.println(msg)
+            }
+            // will trigger a warning if closure was done with unmount i think
+            scope.setState(Disconnected(connect(props), msg)).runNow()
+          }
+        }
     }
 
     def close(s: State): Callback = s match {
-      case ConnectingState => Callback.empty
+      case Disconnected(_, _)     => Callback.empty
+      case Connecting             => Callback.empty
       case ConnectedState(socket) => Callback(socket.close(1000))
     }
 
     def render(props: Props, s: State) =
-      props.render(s.toContext)
+      props.render(
+        s match {
+          case x @ Disconnected(_, _) => (x: Context)
+          case Connecting         => Connecting
+          case ConnectedState(socket) =>
+            Connected(
+              (req: Request) => sendRequest(socket, req)
+            ): Context
+        }
+      )
   }
 
-  val WebSocket = ScalaComponent
+  val Component = ScalaComponent
     .builder[Props]("WebSocket")
-    .initialState(ConnectingState: State)
+    .initialState(Connecting: State)
     .renderBackend[Backend]
     .componentDidMount(context => context.backend.connect(context.props))
     .componentWillUnmount(context => context.backend.close(context.state))
     .build
+
+  def make(
+      websocketURI: String,
+      onOpen: (Request => Callback) => Callback = _ => Callback.empty,
+      onMessage: (((Request => Callback), F[Response]) => Callback) =
+        ((_, _) => Callback.empty)
+  )(
+      render: Context => VdomElement
+  ) = Component(Props(websocketURI, onOpen, onMessage, render))
+}
+object WebSocketConnection {
+  def forArrayBuffer[Request, Response](
+    sendRequest: (WebSocket, Request) => Callback,
+    readResponse: ArrayBuffer => Response)(
+    implicit ec: ExecutionContext
+  ) = new WebSocketConnection[
+    AsyncCallback, Request, Response
+  ](
+    sendRequest = sendRequest,
+    readResponse = (event: MessageEvent) => {
+      val promise = Promise[Response]()
+      val reader = new FileReader();
+      reader.addEventListener(
+        "loadend",
+        (_: Event) => {
+          // reader.result contains the contents of blob as an ArrayBuffer
+          val message =
+            readResponse(reader.result.asInstanceOf[ArrayBuffer])
+          promise.success(message)
+          // props.onMessage(send, message).runNow()
+        }
+      );
+      reader.readAsArrayBuffer(event.data.asInstanceOf[Blob]);
+      AsyncCallback.fromFuture(promise.future)
+    }
+  )
+
+  def forString[Request, Response](
+    sendRequest: (WebSocket, Request) => Callback,
+    readResponse: String => Response
+  ) = new WebSocketConnection[
+    Id, Request, Response
+  ](
+    sendRequest = sendRequest,
+    readResponse = (event: MessageEvent) => readResponse(event.data.toString)
+  )
+
+  // TODO: handle parser errors
+  import io.circe.syntax._
+  def forJsonString[Request: Encoder, Response: Decoder] = new WebSocketConnection[
+    Id, Request, Response
+  ](
+    sendRequest = (socket: WebSocket, r: Request) => Callback(socket.send(r.asJson.noSpaces)),
+    readResponse = (event: MessageEvent) => io.circe.parser.decode[Response](event.data.toString).toOption.get
+  )
 }

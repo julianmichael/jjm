@@ -16,7 +16,12 @@ class CacheCallContent[Request, Response](
   implicit executionContext: ExecutionContext
 ) {
 
-  sealed trait State
+  sealed trait State {
+    def toOption: Option[Response] = this match {
+      case Loading => None
+      case Loaded(content) => Some(content)
+    }
+  }
   case object Loading extends State
   case class Loaded(content: Response) extends State
 

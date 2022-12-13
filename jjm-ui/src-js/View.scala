@@ -45,6 +45,10 @@ object View {
     val shortTextField = style(
       width(50.px)
     )
+
+    val select = style(
+      addClassNames("custom-select")
+    )
   }
   object Styles {
     object Default extends Styles
@@ -138,7 +142,32 @@ class View(val styles: View.Styles) {
 
   case class LiveTextField[A](readValue: String => Option[A], renderValue: A => String) {
 
-    def mod(
+    def modInput(
+      input: TagMod = S.textFieldInput,
+      inputFromValue: Option[A] => TagMod = LiveTextField.defaultInputStyleFromValue[A](_))(
+      value: StateSnapshot[A],
+      placeholderOpt: Option[String] = None,
+      didUpdateValue: A => Callback = _ => Callback.empty
+    ): VdomElement = StringLocal.make(
+      initialValue = renderValue(value.value),
+      shouldRefresh = (s => readValue(s).forall(_ != value.value))
+    ) { inputText =>
+      BoolLocal.make(initialValue = false) { isInvalid =>
+        <.input(input, inputFromValue(Option(value.value).filter(_ => !isInvalid.value)))(
+          ^.`type` := "text",
+          placeholderOpt.whenDefined(ph => ^.placeholder := ph),
+          ^.value := inputText.value,
+          ^.onChange ==> ((e: ReactEventFromInput) =>
+            inputText.setState(e.target.value) >>
+              readValue(e.target.value).fold(isInvalid.setState(true))(v =>
+                isInvalid.setState(false) >> value.setState(v) >> didUpdateValue(v)
+              )
+          )
+        )
+      }
+    }
+
+    def modSpan(
       span: TagMod = S.textFieldSpan,
       label: TagMod = S.textFieldLabel,
       input: TagMod = S.textFieldInput,
@@ -148,34 +177,63 @@ class View(val styles: View.Styles) {
       placeholderOpt: Option[String] = None,
       didUpdateValue: A => Callback = _ => Callback.empty
     ) = <.span(span)(
-      labelOpt.whenDefined(l => <.span(label)(s" $l")),
-      StringLocal.make(
-        initialValue = renderValue(value.value),
-        shouldRefresh = (s => readValue(s).forall(_ != value.value))
-      ) { inputText =>
-        BoolLocal.make(initialValue = false) { isInvalid =>
-          <.input(input, inputFromValue(Option(value.value).filter(_ => !isInvalid.value)))(
-            ^.`type` := "text",
-            placeholderOpt.whenDefined(ph => ^.placeholder := ph),
-            ^.value := inputText.value,
-            ^.onChange ==> ((e: ReactEventFromInput) =>
-              inputText.setState(e.target.value) >>
-                readValue(e.target.value).fold(isInvalid.setState(true))(v =>
-                  isInvalid.setState(false) >> value.setState(v) >> didUpdateValue(v)
-                )
-            )
-          )
-        }
-      }
+      labelOpt.whenDefined(l => <.label(label)(s" $l")),
+      modInput(input, inputFromValue)(value, placeholderOpt, didUpdateValue)
     )
+
+    def modDiv(
+      div: TagMod = S.textFieldSpan,
+      label: TagMod = S.textFieldLabel,
+      input: TagMod = S.textFieldInput,
+      inputFromValue: Option[A] => TagMod = LiveTextField.defaultInputStyleFromValue[A](_))(
+      value: StateSnapshot[A],
+      labelOpt: Option[String] = None,
+      placeholderOpt: Option[String] = None,
+      didUpdateValue: A => Callback = _ => Callback.empty
+    ) = <.div(div)(
+      labelOpt.whenDefined(l => <.label(label)(s" $l")),
+      modInput(input, inputFromValue)(value, placeholderOpt, didUpdateValue)
+    )
+
+    def div(
+      value: StateSnapshot[A],
+      labelOpt: Option[String] = None,
+      placeholderOpt: Option[String] = None,
+      didUpdateValue: A => Callback = _ => Callback.empty
+    ) = modDiv()(value, labelOpt, placeholderOpt, didUpdateValue)
+
+    def span(
+      value: StateSnapshot[A],
+      labelOpt: Option[String] = None,
+      placeholderOpt: Option[String] = None,
+      didUpdateValue: A => Callback = _ => Callback.empty
+    ) = modSpan()(value, labelOpt, placeholderOpt, didUpdateValue)
+
+    def input(
+      value: StateSnapshot[A],
+      placeholderOpt: Option[String] = None,
+      didUpdateValue: A => Callback = _ => Callback.empty
+    ) = modInput()(value, placeholderOpt, didUpdateValue)
+
+    // use span for backwards compatibility
+    def mod(
+      span: TagMod = S.textFieldSpan,
+      label: TagMod = S.textFieldLabel,
+      input: TagMod = S.textFieldInput,
+      inputFromValue: Option[A] => TagMod = LiveTextField.defaultInputStyleFromValue[A](_))(
+      value: StateSnapshot[A],
+      labelOpt: Option[String] = None,
+      placeholderOpt: Option[String] = None,
+      didUpdateValue: A => Callback = _ => Callback.empty
+    ) = modSpan(span, label, input, inputFromValue)(value, labelOpt, placeholderOpt, didUpdateValue)
 
     def apply(
       value: StateSnapshot[A],
       labelOpt: Option[String] = None,
       placeholderOpt: Option[String] = None,
       didUpdateValue: A => Callback = _ => Callback.empty
-    ) = mod()(value, labelOpt, placeholderOpt, didUpdateValue)
-  }
+    ) = span(value, labelOpt, placeholderOpt, didUpdateValue)
+}
   object LiveTextField {
     def Double = LiveTextField[Double]((s: String) => scala.util.Try(s.toDouble).toOption, _.toString)
     def String = LiveTextField[String](Option(_), _.toString)
@@ -310,7 +368,7 @@ class View(val styles: View.Styles) {
     show: A => String,
     none: String = "None") {
 
-    def modFull(select: TagMod = TagMod.empty)(
+    def modFull(select: TagMod = S.select)(
       choices: Set[A],
       curChoice: Option[A],
       setChoice: Option[A] => Callback
@@ -332,7 +390,7 @@ class View(val styles: View.Styles) {
       }
     )
 
-    def mod(select: TagMod = TagMod.empty)(
+    def mod(select: TagMod = S.select)(
       choices: Set[A],
       choice: StateSnapshot[Option[A]]
     ): TagOf[html.Select] = modFull(select)(choices, choice.value, choice.setState)
@@ -353,7 +411,7 @@ class View(val styles: View.Styles) {
   }
 
   case class Select[A](show: A => String) {
-    def modFull(select: TagMod = TagMod.empty)(
+    def modFull(select: TagMod = S.select)(
       choices: List[A],
       curChoice: A, setChoice: A => Callback,
     ): TagOf[html.Select] = <.select(select)(
@@ -370,7 +428,7 @@ class View(val styles: View.Styles) {
       }
     )
 
-    def mod(select: TagMod = TagMod.empty)(
+    def mod(select: TagMod = S.select)(
       choices: List[A],
       choice: StateSnapshot[A],
     ): TagOf[html.Select] = modFull(select)(choices, choice.value, choice.setState)
