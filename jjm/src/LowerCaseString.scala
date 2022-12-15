@@ -73,9 +73,9 @@ protected[jjm] object LowerCaseStringImpl extends LowerCaseStringCapsule {
       def combine(x: LowerCaseString, y: LowerCaseString): LowerCaseString =
         x + y
 
-      override def combineAll(xs: TraversableOnce[LowerCaseString]): LowerCaseString = {
+      override def combineAll(xs: IterableOnce[LowerCaseString]): LowerCaseString = {
         val sb = new StringBuilder
-        xs.foreach(sb.append)
+        xs.iterator.foreach(sb.append)
         sb.toString
       }
     }

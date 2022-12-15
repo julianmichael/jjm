@@ -8,6 +8,7 @@ import cats.implicits._
 
 import monocle.Iso
 import monocle.macros.GenPrism
+import scala.annotation.nowarn
 
 sealed trait OrWrapped[F[_], A] {
   import OrWrapped._
@@ -37,8 +38,8 @@ object OrWrapped {
     def wrappedValue[F[_], A] = Iso[Wrapped[F, A], F[A]](_.wrappedValue)(Wrapped.apply[F, A])
   }
 
-  def pure[F[_], A] = GenPrism[OrWrapped[F, A], Pure[F, A]].composeIso(Pure.value)
-  def wrapped[F[_], A] = GenPrism[OrWrapped[F, A], Wrapped[F, A]].composeIso(Wrapped.wrappedValue)
+  @nowarn def pure[F[_], A] = GenPrism[OrWrapped[F, A], Pure[F, A]].composeIso(Pure.value)
+  @nowarn def wrapped[F[_], A] = GenPrism[OrWrapped[F, A], Wrapped[F, A]].composeIso(Wrapped.wrappedValue)
 
   def pure[F[_]] = new PureBuilder[F]
   class PureBuilder[F[_]] {

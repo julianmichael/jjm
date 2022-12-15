@@ -1,53 +1,54 @@
+import $ivy.`com.goyeau::mill-scalafix::0.2.11`
+import com.goyeau.mill.scalafix.ScalafixModule
 import mill._, mill.scalalib._, mill.scalalib.publish._, mill.scalajslib._
 import mill.scalalib.scalafmt._
 import coursier.maven.MavenRepository
 import os._
 
-val thisPublishVersion = "0.2.2"
+val thisPublishVersion = "0.3.0-SNAPSHOT"
 val scalaVersions = List(
-  "2.12.13",
-  "2.13.4"
+  "2.13.10"
 )
-val thisScalaJSVersion = "1.4.0"
+val thisScalaJSVersion = "1.12.0"
 
 val macroParadiseVersion = "2.1.1"
-val kindProjectorVersion = "0.11.3"
+val kindProjectorVersion = "0.13.2"
 // val splainVersion = "0.3.4"
 
 // --- core deps ---
 // cats libs -- maintain version agreement or whatever
-val catsVersion = "2.3.1"
-val shapelessVersion = "2.3.3"
-val kittensVersion = "2.2.1"
-val circeVersion = "0.13.0"
-val monocleVersion = "2.0.3"
-val simulacrumVersion = "1.0.0"
+val catsVersion = "2.9.0"
+val shapelessVersion = "2.3.10"
+val kittensVersion = "3.0.0"
+val circeVersion = "0.14.3"
+val monocleVersion = "3.1.0"
+val simulacrumVersion = "1.0.1"
 
 // for inflection dictionary on jvm; TODO roll my own to be cross-platform and avoid the dep
 val trove4jVersion = "3.0.1"
 
 // --- io deps ---
-val catsEffectVersion = "2.3.1"
-val fs2Version = "2.5.0"
-val http4sVersion = "0.21.18"
+val catsEffectVersion = "3.4.2"
+val fs2Version = "3.4.0"
+val http4sVersion = "0.23.16"
 // js
-val scalajsDomVersion = "1.1.0"
+val scalajsDomVersion = "2.3.0"
 
 // --- datasets deps ---
-val fastparseVersion = "2.3.1"
+// val fastparseVersion = "2.3.1"
 
 // --- corenlp deps ---
 val corenlpVersion = "3.6.0"
 
 // --- ui deps ---
-val scalajsReactVersion = "1.7.7"
-val scalacssVersion = "0.7.0"
+val scalajsReactVersion = "2.1.1"
+val scalacssVersion = "1.0.0"
 
 // val scalatestVersion = "3.0.5"
 // val scalacheckVersion = "1.13.5"
 // val disciplineVersion = "0.9.0"
 
-trait CommonModule extends CrossScalaModule with ScalafmtModule {
+trait CommonModule extends CrossScalaModule with ScalafmtModule with ScalafixModule {
 
   def platformSegment: String
 
@@ -60,21 +61,15 @@ trait CommonModule extends CrossScalaModule with ScalafmtModule {
     "-unchecked",
     "-deprecation",
     "-feature",
-    "-language:higherKinds"
-  ) ++ (
-    if(crossScalaVersion.startsWith("2.12")) {
-      Seq("-Ypartial-unification")
-    } else Seq("-Ymacro-annotations")
+    "-language:higherKinds",
+    "-Yrangepos",
+    "-Ymacro-annotations"
   )
 
 
   override def scalacPluginIvyDeps = super.scalacPluginIvyDeps() ++ Agg(
     // ivy"io.tryp:::splain:$splainVersion",
     ivy"org.typelevel:::kind-projector:$kindProjectorVersion"
-  ) ++ (
-    if(crossScalaVersion.startsWith("2.12")) {
-      Agg(ivy"org.scalamacros:::paradise:$macroParadiseVersion")
-    } else Agg()
   )
 
   override def ivyDeps = Agg(
@@ -82,9 +77,9 @@ trait CommonModule extends CrossScalaModule with ScalafmtModule {
     ivy"com.chuusai::shapeless::$shapelessVersion",
     ivy"org.typelevel::simulacrum:$simulacrumVersion",
     ivy"org.typelevel::kittens::$kittensVersion",
-    ivy"com.github.julien-truffaut::monocle-core::$monocleVersion",
-    ivy"com.github.julien-truffaut::monocle-macro::$monocleVersion",
-    ivy"com.github.julien-truffaut::monocle-generic::$monocleVersion",
+    ivy"dev.optics::monocle-core::$monocleVersion",
+    ivy"dev.optics::monocle-macro::$monocleVersion",
+    ivy"dev.optics::monocle-generic::$monocleVersion",
     ivy"io.circe::circe-core::$circeVersion",
     ivy"io.circe::circe-parser::$circeVersion",
     ivy"io.circe::circe-generic::$circeVersion"
@@ -146,7 +141,6 @@ object io extends Module {
       ivy"co.fs2::fs2-io::$fs2Version",
       ivy"org.http4s::http4s-client::$http4sVersion",
       ivy"org.http4s::http4s-dsl::$http4sVersion",
-      ivy"org.http4s::http4s-blaze-server::$http4sVersion",
       ivy"org.http4s::http4s-circe::$http4sVersion"
     )
   }
@@ -161,41 +155,28 @@ object io extends Module {
   object js extends Cross[Js](scalaVersions: _*)
 }
 
-object datasets extends Module {
-  trait DatasetsModule extends CommonPublishModule {
-    def artifactName = "jjm-datasets"
-    def millSourcePath = build.millSourcePath / "jjm-datasets"
-    override def ivyDeps = super.ivyDeps() ++ Agg(
-      ivy"com.lihaoyi::fastparse::$fastparseVersion"
-      // ivy"org.typelevel::cats-effect::$catsEffectVersion",
-      // ivy"co.fs2::fs2-core::$fs2Version"
-    )
-  }
+// NOTE: commented out for the time being to help with version migrations --- isn't critical
+// object datasets extends Module {
+//   trait DatasetsModule extends CommonPublishModule {
+//     def artifactName = "jjm-datasets"
+//     def millSourcePath = build.millSourcePath / "jjm-datasets"
+//     override def ivyDeps = super.ivyDeps() ++ Agg(
+//       ivy"com.lihaoyi::fastparse::$fastparseVersion"
+//       // ivy"org.typelevel::cats-effect::$catsEffectVersion",
+//       // ivy"co.fs2::fs2-core::$fs2Version"
+//     )
+//   }
 
-  class Js(val crossScalaVersion: String) extends DatasetsModule with JsPlatform {
-    def moduleDeps = List(io.js(crossScalaVersion))
-  }
-  object js extends Cross[Js](scalaVersions: _*)
+//   class Js(val crossScalaVersion: String) extends DatasetsModule with JsPlatform {
+//     def moduleDeps = List(io.js(crossScalaVersion))
+//   }
+//   object js extends Cross[Js](scalaVersions: _*)
 
-  class Jvm(val crossScalaVersion: String) extends DatasetsModule with JvmPlatform {
-    def moduleDeps = List(io.jvm(crossScalaVersion))
-    // object test extends Tests {
-    //   def moduleDeps = super.moduleDeps
-    //   override def millSourcePath = datasets.this.millSourcePath / "test"
-    //   override def scalaVersion = jvm.this.scalaVersion
-    //   // def platformSegment = jvm.this.platformSegment
-    //   override def ivyDeps = Agg(
-    //     ivy"org.julianmichael::freelog::$freelogVersion",
-    //     ivy"org.scalatest::scalatest:$scalatestVersion",
-    //     ivy"org.scalacheck::scalacheck:$scalacheckVersion",
-    //     ivy"org.typelevel::discipline-core:$disciplineVersion"
-    //       // ivy"org.typelevel::discipline-scalatest:$disciplineVersion-SNAPSHOT"
-    //   )
-    //   def testFrameworks = Seq("org.scalatest.tools.Framework")
-    // }
-  }
-  object jvm extends Cross[Jvm](scalaVersions: _*)
-}
+//   class Jvm(val crossScalaVersion: String) extends DatasetsModule with JvmPlatform {
+//     def moduleDeps = List(io.jvm(crossScalaVersion))
+//   }
+//   object jvm extends Cross[Jvm](scalaVersions: _*)
+// }
 
 class CoreNLPModule(val crossScalaVersion: String) extends CommonPublishModule with JvmPlatform {
   def artifactName = "jjm-corenlp"
@@ -218,10 +199,11 @@ class UIModule(val crossScalaVersion: String) extends CommonPublishModule with J
   def moduleDeps = Seq(core.js())
 
   def ivyDeps = Agg(
+    ivy"com.github.japgolly.scalajs-react::core-ext-cats::$scalajsReactVersion",
+    ivy"com.github.japgolly.scalajs-react::core-ext-cats_effect::$scalajsReactVersion",
     ivy"com.github.japgolly.scalajs-react::core::$scalajsReactVersion",
     ivy"com.github.japgolly.scalajs-react::extra::$scalajsReactVersion",
-    ivy"com.github.japgolly.scalajs-react::ext-monocle-cats::$scalajsReactVersion",
-    ivy"com.github.japgolly.scalajs-react::ext-cats::$scalajsReactVersion",
+    ivy"com.github.japgolly.scalajs-react::extra-ext-monocle3::$scalajsReactVersion",
     ivy"com.github.japgolly.scalacss::core::$scalacssVersion",
     ivy"com.github.japgolly.scalacss::ext-react::$scalacssVersion"
   )

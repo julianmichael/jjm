@@ -2,8 +2,8 @@ package jjm.ui
 
 import japgolly.scalajs.react.vdom.html_<^._
 import japgolly.scalajs.react.vdom.TagOf
-import japgolly.scalajs.react.CatsReact._
-import japgolly.scalajs.react.MonocleReact._
+// import japgolly.scalajs.react.ReactCats._
+// import japgolly.scalajs.react.ReactMonocle._
 import japgolly.scalajs.react._
 import japgolly.scalajs.react.extra.StateSnapshot
 
@@ -15,6 +15,7 @@ import org.scalajs.dom.ext.KeyCode
 
 import cats.Order
 import cats.implicits._
+import monocle.Focus
 
 object View {
   trait Styles extends StyleSheet.Inline {
@@ -587,7 +588,7 @@ class View(val styles: View.Styles) {
       val contigSpanLists = NonEmptyList(groupingState.currentGroup, groupingState.completeGroups)
       val answerHighlighties = contigSpanLists.reverse.map { spanList =>
         val (groupTokens, groupSpans) = cropPassageAndSpans(
-          tokens, spanList, Optics.first[(Span, Rgba), Span]
+          tokens, spanList, Focus[(Span, Rgba)](_._1)
         )
         List(
           <.span(
@@ -621,7 +622,7 @@ class View(val styles: View.Styles) {
       val contigSpanLists = NonEmptyList(groupingState.currentGroup, groupingState.completeGroups)
       val answerHighlighties = contigSpanLists.reverse.map { spanList =>
         val (groupTokens, groupSpans) = cropPassageAndSpans(
-          tokens, spanList, Optics.first[(Span, Rgba), Span]
+          tokens, spanList, Focus[(Span, Rgba)](_._1)
         )
         List(
           <.span(

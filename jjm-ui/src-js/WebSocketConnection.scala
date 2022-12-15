@@ -2,12 +2,12 @@ package jjm.ui
 
 import scalajs.js.typedarray.ArrayBuffer
 
+import org.scalajs.dom.Blob
+import org.scalajs.dom.CloseEvent
+import org.scalajs.dom.Event
+import org.scalajs.dom.FileReader
+import org.scalajs.dom.MessageEvent
 import org.scalajs.dom.WebSocket
-import org.scalajs.dom.raw.Blob
-import org.scalajs.dom.raw.CloseEvent
-import org.scalajs.dom.raw.MessageEvent
-import org.scalajs.dom.raw.Event
-import org.scalajs.dom.raw.FileReader
 
 import japgolly.scalajs.react.vdom.html_<^._
 import japgolly.scalajs.react._

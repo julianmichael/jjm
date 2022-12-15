@@ -2,7 +2,8 @@ package jjm.io
 
 import cats.implicits._
 import cats.data.NonEmptyList
-import cats.effect.{ContextShift, ExitCode, IO, IOApp, Resource}
+
+import cats.effect._
 
 import _root_.io.circe.jawn
 import _root_.io.circe.{Encoder, Decoder}
@@ -10,12 +11,13 @@ import _root_.io.circe.Printer
 
 import fs2.Stream
 
-import java.nio.file.{Path => NIOPath}
 import java.util.concurrent.Executors
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContextExecutorService
-import cats.effect.Blocker
+import fs2.io.file.Files
+import fs2.io.file.Path
+import fs2.text
 
 object FileUtil {
 
@@ -35,7 +37,7 @@ object FileUtil {
     case object Auto extends CompressionSetting
   }
 
-  def useCompression(path: NIOPath, setting: CompressionSetting): Boolean = setting match {
+  def useCompression(path: Path, setting: CompressionSetting): Boolean = setting match {
     case CompressionSetting.Compressed => true
     case CompressionSetting.Uncompressed => false
     case CompressionSetting.Auto => path.toString.endsWith(".gz")
@@ -44,23 +46,22 @@ object FileUtil {
   val bufferNumBytes = 4 * 4096
 
   def streamLines(
-    path: NIOPath, blocker: Blocker, compression: CompressionSetting = CompressionSetting.Auto)(
-    implicit cs: ContextShift[IO]
+    path: Path, compression: CompressionSetting = CompressionSetting.Auto
   ): Stream[IO, String] = {
-    val fileBytes = fs2.io.file.readAll[IO](path, blocker, bufferNumBytes)
+    val fileBytes = Files[IO].readAll(path)
     val textBytes = if(useCompression(path, compression)) {
-      fileBytes.through(fs2.compression.gunzip(bufferNumBytes)).flatMap(_.content)
+      fileBytes.through(fs2.compression.Compression[IO].gunzip(bufferNumBytes)).flatMap(_.content)
     } else fileBytes
     textBytes
-      .through(fs2.text.utf8Decode)
+      .through(fs2.text.utf8.decode)
       .through(fs2.text.lines)
   }
 
   def streamJsonLines[A](
-    path: NIOPath, blocker: Blocker, compression: CompressionSetting = CompressionSetting.Auto)(
-    implicit cs: ContextShift[IO], decoder: Decoder[A]
+    path: Path, compression: CompressionSetting = CompressionSetting.Auto)(
+    implicit decoder: Decoder[A]
   ): Stream[IO, A] = {
-    streamLines(path, blocker, compression)
+    streamLines(path, compression)
       .filter(_.nonEmpty)
       .flatMap(line =>
         Stream.fromEither[IO](
@@ -71,24 +72,19 @@ object FileUtil {
   }
 
   def readLines(
-    path: NIOPath, compression: CompressionSetting = CompressionSetting.Auto)(
-    implicit cs: ContextShift[IO]
+    path: Path, compression: CompressionSetting = CompressionSetting.Auto
   ): Stream[IO, String] = {
-    Stream.resource(Blocker[IO]).flatMap { blocker =>
-      streamLines(path, blocker, compression)
-    }
+    streamLines(path, compression)
   }
 
   def readJsonLines[A](
-    path: NIOPath, compression: CompressionSetting = CompressionSetting.Auto)(
-    implicit cs: ContextShift[IO], decoder: Decoder[A]
+    path: Path, compression: CompressionSetting = CompressionSetting.Auto)(
+    implicit decoder: Decoder[A]
   ): Stream[IO, A] = {
-    Stream.resource(Blocker[IO]).flatMap { blocker =>
-      streamJsonLines(path, blocker, compression)
-    }
+    streamJsonLines(path, compression)
   }
 
-  def readJson[A: Decoder](path: NIOPath): IO[A] = {
+  def readJson[A: Decoder](path: Path): IO[A] = {
     IO(
       _root_.io.circe.jawn.decodeFile[A](new java.io.File(path.toString)) match {
         case Right(a) => a
@@ -97,68 +93,67 @@ object FileUtil {
     )
   }
 
-  def writeJson[A: Encoder](path: NIOPath, printer: Printer = io.circe.Printer.noSpaces)(a: A): IO[Unit] = {
+  def writeJson[A: Encoder](path: Path, printer: Printer = io.circe.Printer.noSpaces)(a: A): Any = {
     import _root_.io.circe.syntax._
-    IO(Option(path.getParent).foreach(java.nio.file.Files.createDirectories(_))) >>
-      IO(java.nio.file.Files.write(path, printer.print(a.asJson).getBytes("UTF-8")))
+    writeString(path)(printer.print(a.asJson))
   }
 
-  def writeString(path: NIOPath)(a: String): IO[Unit] = {
-    IO(java.nio.file.Files.write(path, a.getBytes("UTF-8")))
+  def writeString(path: Path)(a: String): IO[Unit] = {
+    path.parent.traverse_(Files[IO].createDirectories(_)) >>
+      Stream.emit[IO, String](a)
+        .through(text.utf8.encode)
+        .through(Files[IO].writeAll(path))
+        .compile.drain
   }
 
-  def readString(path: NIOPath): IO[String] = {
-    import scala.collection.JavaConverters._
-    IO(java.nio.file.Files.lines(path).iterator.asScala.mkString("\n"))
+  def readString(path: Path): IO[String] = {
+    Files[IO].readUtf8(path).compile.foldMonoid
   }
 
-  def writeJsonLines[A](path: NIOPath, printer: Printer = io.circe.Printer.noSpaces, compression: CompressionSetting = CompressionSetting.Auto)(as: Seq[A])(
-    implicit cs: ContextShift[IO], encoder: Encoder[A]
+  def writeJsonLines[A](path: Path, printer: Printer = io.circe.Printer.noSpaces, compression: CompressionSetting = CompressionSetting.Auto)(as: Seq[A])(
+    implicit encoder: Encoder[A]
   ): IO[Unit] = {
     import _root_.io.circe.syntax._
-    IO(Option(path.getParent).foreach(java.nio.file.Files.createDirectories(_))) >>
-      Stream.resource(Blocker[IO]).flatMap { blocker =>
-        val textOut = Stream.emits[IO, A](as)
-          .map(a => printer.print(a.asJson))
-          .intersperse("\n")
-          .through(fs2.text.utf8Encode)
-        val compressedTextOut = if(useCompression(path, compression)) {
-          textOut.through(fs2.compression.gzip(bufferNumBytes))
-        } else textOut
-        compressedTextOut.through(fs2.io.file.writeAll(path, blocker))
-      }.compile.drain
+    path.parent.traverse_(Files[IO].createDirectories(_)) >> {
+      val textOut = Stream.emits[IO, A](as)
+        .map(a => printer.print(a.asJson))
+        .intersperse("\n")
+        .through(fs2.text.utf8.encode)
+      val compressedTextOut = if(useCompression(path, compression)) {
+        textOut.through(fs2.compression.Compression[IO].gzip(bufferNumBytes))
+      } else textOut
+      compressedTextOut.through(Files[IO].writeAll(path)).compile.drain
+    }
   }
 
-  def writeJsonLinesStreaming[A](path: NIOPath, printer: Printer, compression: CompressionSetting = CompressionSetting.Auto)(as: Stream[IO, A])(
-    implicit cs: ContextShift[IO], encoder: Encoder[A]
+  def writeJsonLinesStreaming[A](path: Path, printer: Printer, compression: CompressionSetting = CompressionSetting.Auto)(as: Stream[IO, A])(
+    implicit encoder: Encoder[A]
   ): IO[Unit] = {
     import _root_.io.circe.syntax._
-    IO(Option(path.getParent).foreach(java.nio.file.Files.createDirectories(_))) >>
-      Stream.resource(Blocker[IO]).flatMap { blocker =>
-        val textOut = as
-          .map(a => printer.print(a.asJson))
-          .intersperse("\n")
-          .through(fs2.text.utf8Encode)
-        val compressedTextOut = if(useCompression(path, compression)) {
-          textOut.through(fs2.compression.gzip(bufferNumBytes))
-        } else textOut
-        compressedTextOut.through(fs2.io.file.writeAll(path, blocker))
-      }.compile.drain
+    path.parent.traverse_(Files[IO].createDirectories(_)) >> {
+      val textOut = as
+        .map(a => printer.print(a.asJson))
+        .intersperse("\n")
+        .through(fs2.text.utf8.encode)
+      val compressedTextOut = if(useCompression(path, compression)) {
+        textOut.through(fs2.compression.Compression[IO].gzip(bufferNumBytes))
+      } else textOut
+      compressedTextOut.through(Files[IO].writeAll(path)).compile.drain
+    }
   }
 
-  def writeLines[A](path: NIOPath, getString: A => String, compression: CompressionSetting = CompressionSetting.Auto)(as: Seq[A])(
-    implicit cs: ContextShift[IO], encoder: Encoder[A]
+  def writeLines[A](path: Path, getString: A => String, compression: CompressionSetting = CompressionSetting.Auto)(as: Seq[A])(
+    implicit encoder: Encoder[A]
   ): IO[Unit] = {
-    IO(Option(path.getParent).foreach(java.nio.file.Files.createDirectories(_))) >>
-      Stream.resource(Blocker[IO]).flatMap { blocker =>
-        val textOut = Stream.emits[IO, A](as)
-          .map(getString)
-          .intersperse("\n")
-          .through(fs2.text.utf8Encode)
-        val compressedTextOut = if(useCompression(path, compression)) {
-          textOut.through(fs2.compression.gzip(bufferNumBytes))
-        } else textOut
-        compressedTextOut.through(fs2.io.file.writeAll(path, blocker))
-      }.compile.drain
+    path.parent.traverse_(Files[IO].createDirectories(_)) >> {
+      val textOut = Stream.emits[IO, A](as)
+        .map(getString)
+        .intersperse("\n")
+        .through(fs2.text.utf8.encode)
+      val compressedTextOut = if(useCompression(path, compression)) {
+        textOut.through(fs2.compression.Compression[IO].gzip(bufferNumBytes))
+      } else textOut
+      compressedTextOut.through(Files[IO].writeAll(path)).compile.drain
+    }
   }
 }

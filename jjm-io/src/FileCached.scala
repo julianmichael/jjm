@@ -4,7 +4,6 @@ import java.nio.file.Path
 import java.nio.file.Files
 
 import cats.effect.IO
-import cats.effect.concurrent.Ref
 import cats.implicits._
 
 class FileCached[A](

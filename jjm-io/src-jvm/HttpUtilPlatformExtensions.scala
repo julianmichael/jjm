@@ -5,9 +5,9 @@ import jjm.DotEncoder
 import jjm.DotDecoder
 import jjm.DotKleisli
 
-// import cats.Functor
-import cats.effect.Effect
 import cats.implicits._
+import cats.MonadError
+import cats.effect.Concurrent
 
 import _root_.io.circe.{Encoder, Decoder}
 import _root_.io.circe.Json
@@ -16,7 +16,7 @@ import org.http4s._
 import org.http4s.client.Client
 
 trait HttpUtilPlatformExtensions {
-  def makeHttpPostClient[F[_]: Effect, Req <: Dot : Encoder : DotDecoder](
+  def makeHttpPostClient[F[_]: Concurrent, Req <: Dot : Encoder : DotDecoder](
     client: Client[F], endpoint: Uri
   ): DotKleisli[F, Req] = {
     object dsl extends org.http4s.dsl.Http4sDsl[F]
@@ -24,15 +24,16 @@ trait HttpUtilPlatformExtensions {
     import org.http4s.circe._
     implicit val entityEncoder = jsonEncoderOf[F, Req]
     new DotKleisli[F, Req] {
+      EntityDecoder
       def apply(req: Req): F[req.Out] = client
         .fetchAs[Json](Request[F](method = Method.POST, uri = endpoint).withEntity(req))
         .map(implicitly[DotDecoder[Req]].apply(req).decodeJson(_))
         .map(_.leftMap(new RuntimeException(_)))
-        .flatMap(Effect[F].fromEither[req.Out](_))
+        .flatMap(Concurrent[F].fromEither[req.Out](_))
     }
   }
 
-  def makeHttpPostServer[F[_]: Effect, Req <: Dot : Decoder : DotEncoder](
+  def makeHttpPostServer[F[_]: Concurrent, Req <: Dot : Decoder : DotEncoder](
     backend: DotKleisli[F, Req]
   ): HttpRoutes[F] = {
     object dsl extends org.http4s.dsl.Http4sDsl[F]

@@ -13,7 +13,7 @@ object Tokenizer {
     import java.io.StringReader
     import edu.stanford.nlp.process.PTBTokenizer
     import edu.stanford.nlp.process.WordTokenFactory
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
     new PTBTokenizer(new StringReader(s), new WordTokenFactory(), "").tokenize.asScala.toVector
       .map(t => Token(t.word))
   }
@@ -22,7 +22,7 @@ object Tokenizer {
     import java.io.StringReader
     import edu.stanford.nlp.process.PTBTokenizer
     import edu.stanford.nlp.process.CoreLabelTokenFactory
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
     new PTBTokenizer(new StringReader(s), new CoreLabelTokenFactory(), "invertible=true")
       .tokenize.asScala.toVector.map(coreLabel =>
         Token.field(coreLabel.word)

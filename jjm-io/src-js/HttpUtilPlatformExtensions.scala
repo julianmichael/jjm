@@ -5,8 +5,6 @@ import jjm.DotKleisli
 import jjm.DotDecoder
 import jjm.implicits._
 
-import cats.effect.Effect
-
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext
 
@@ -22,7 +20,7 @@ trait HttpUtilPlatformExtensions {
     Lambda[A => () => Future[A]], Req
   ] = new DotKleisli[Lambda[A => () => Future[A]], Req] {
     def apply(req: Req): () => Future[req.Out] = () => {
-      org.scalajs.dom.ext.Ajax.post(url = endpoint, data = req.asJson.noSpaces)
+      Ajax.post(url = endpoint, data = req.asJson.noSpaces)
         .map(resp => io.circe.parser.decode(resp.responseText)(implicitly[DotDecoder[Req]].apply(req)))
         .flatMap {
           case Right(res) => Future.successful(res)

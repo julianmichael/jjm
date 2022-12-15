@@ -74,8 +74,8 @@ object ISpan {
 
   implicit val ispanDecoder: Decoder[ISpan] = Decoder.instance { c =>
     for {
-      begin <- c.downN(0).as[Int].right
-      end   <- c.downN(1).as[Int].right
+      begin <- c.downN(0).as[Int]
+      end   <- c.downN(1).as[Int]
     } yield ISpan(begin, end)
   }
 
@@ -135,8 +135,8 @@ object ESpan {
 
   implicit val espanDecoder: Decoder[ESpan] = Decoder.instance { c =>
     for {
-      begin <- c.downN(0).as[Int].right
-      end   <- c.downN(1).as[Int].right
+      begin <- c.downN(0).as[Int]
+      end   <- c.downN(1).as[Int]
     } yield ESpan(begin, end)
   }
 
